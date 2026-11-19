@@ -33,6 +33,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -40,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -84,7 +86,10 @@ internal fun LibraryScreen(
     identity: IdentityActions,
     loadImage: suspend (Uri, Int) -> Bitmap?,
 ) {
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as org.photolibrary.app.PhotoLibraryApplication
+    val context = LocalContext.current
+    val app = context.applicationContext as org.photolibrary.app.PhotoLibraryApplication
+    var modelCapabilityVersion by remember(app) { mutableIntStateOf(0) }
+    val modelCapabilities = remember(app, modelCapabilityVersion) { app.modelCapabilities }
     val feedback = rememberSearchFeedback(remember(app) { FeedbackStore(app.storage) }, state)
     val hasQuery = state.query.isNotBlank() && state.visualSeed == null
     val rankedPhotos = remember(state.visiblePhotos, state.resultGroups, state.visualScores, state.query, hasQuery, feedback.history, feedback.session) {
@@ -134,8 +139,28 @@ internal fun LibraryScreen(
                 ) {
                     Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
                     LearningOptions(feedback)
-                    LibrarySourcesMenu(state, onAllowPhotos, onChooseFolder, onPermissionSettings, onRemove, onRefresh,
-                        onSelectSelf, onPauseIndexing, onResumeIndexing, suggestions.open, onAnalyzeClothing)
+                    LibrarySourcesMenu(
+                        state = state,
+                        onAllowPhotos = onAllowPhotos,
+                        onChooseFolder = onChooseFolder,
+                        onPermissionSettings = onPermissionSettings,
+                        onRemoveFolder = onRemove,
+                        onRefresh = onRefresh,
+                        onSelectSelf = onSelectSelf,
+                        onPauseIndexing = onPauseIndexing,
+                        onResumeIndexing = onResumeIndexing,
+                        onNameSuggestions = suggestions.open,
+                        onAnalyzeClothing = onAnalyzeClothing,
+                        capabilities = modelCapabilities,
+                        modelPackStored = app.modelPackStored,
+                        onInstallModelPack = { uri ->
+                            val stream = context.contentResolver.openInputStream(uri)
+                                ?: error("Could not open the selected model pack")
+                            stream.use { app.modelPackInstaller.install(it) }
+                        },
+                        onRemoveModelPack = { app.modelPackInstaller.remove() },
+                        onCapabilitiesChanged = { modelCapabilityVersion++ },
+                    )
                 }
                 FeedbackReceipt(feedback, state.query) { uri -> if (state.photos.any { it.uri == uri }) onOpen(uri) }
                 PhotoGrid(state.copy(visiblePhotos = rankedPhotos), feedback, state.visiblePhotos, onAllowPhotos, onChooseFolder, onSearch, onOpen, onAllowPhotoLocations, identity.open,
@@ -409,7 +434,7 @@ private fun PhotoResultsGrid(state: LibraryState, feedback: SearchFeedback, base
                 )
                 Column(Modifier.padding(10.dp)) {
                     Text(photo.title(), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (state.query.isNotBlank() && state.visualSeed == null) ResultFeedbackMenu(feedback, state.query, photo) {
+                    if (state.query.isNotBlank() && state.visualSeed == null && state.namedSearch == null) ResultFeedbackControls(feedback, state.query, photo) {
                         FeedbackFeatures.from(normalizedFeedbackQuery(state.query), photo,
                             baselineRanks[photo.uri] ?: 0, resultLabel(photo.uri) ?: 0, state.visualScores[photo.uri])
                     }

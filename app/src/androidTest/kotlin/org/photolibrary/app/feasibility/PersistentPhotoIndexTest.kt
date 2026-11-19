@@ -72,6 +72,8 @@ class PersistentPhotoIndexTest {
             db.execSQL("ALTER TABLE person_garments DROP COLUMN write_token")
             db.execSQL("ALTER TABLE person_garments DROP COLUMN pixel_revision")
             db.execSQL("DROP TABLE self_identity")
+            db.execSQL("DROP TABLE identity_rejections")
+            db.execSQL("DROP TABLE named_dated_aliases")
             db.version = 7
         }
         val reopened = EncryptedPhotoIndex(directory, alias)
@@ -80,7 +82,7 @@ class PersistentPhotoIndexTest {
         assertTrue(migrated.contentProofs().isEmpty())
         assertEquals(1, migrated.reconcile(mapOf(uri to "source:legacy")).references.size)
         assertTrue(migrated.reconcile(mapOf(uri to "source:renamed")).references.isEmpty())
-        reopened.withDatabase { assertEquals(11, it.version) }
+        reopened.withDatabase { assertEquals(14, it.version) }
     }
 
     @Test

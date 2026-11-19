@@ -7,7 +7,6 @@ import androidx.annotation.StringRes
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.work.WorkInfo
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
@@ -110,8 +109,6 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private val encodedQueries = android.util.LruCache<String, PhotoEmbedding>(32)
     private var textWarmupJob: Job? = null
     private var inputSearchJob: Job? = null
-    private var indexJob: Job? = null
-    private var visualJob: Job? = null
     private var suggestionJob: Job? = null
     private var identityJob: Job? = null
     private var identityMaintenanceJob: Job? = null
@@ -129,6 +126,21 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     )
     val state = mutableState.asStateFlow()
     private val queries = PhotoQueryExecution(viewModelScope) { PhotoQuerySnapshot.capture(state.value) }
+    private val photoIndexRestoration by lazy {
+        PhotoIndexRestoration(
+            viewModelScope,
+            state,
+            mutableState,
+            index,
+            { if (context.clip.available) context.visualIndex else null },
+            searchableText,
+            embeddings,
+            ::withIndexedPhotos,
+            ::refreshSearchResults,
+            ::prepareTextSearch,
+            { scheduleVisualSearch() },
+        )
+    }
     private val cacheRestoration = PhotoCacheRestoration { state.value }
     private val locationPublication = PhotoLocationPublication(context.photoLocations::permissionGranted, library::galleryAccess)
 
@@ -176,10 +188,10 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                         }
                         val inputs = fresh.map { IndexPhoto(it.uri, it.sourceRevision) }
                         val unavailable = sources.unavailableSources
-                        if (context.clip.available && !restoreChanges(snapshot, context.visualIndex, visualJob, embeddings,
+                        if (context.clip.available && !restoreChanges(snapshot, context.visualIndex, photoIndexRestoration.visualJob, embeddings,
                                 inputs, unavailable, progress.visualUpdated.filterValues { it > visualCacheGeneration }.keys)) return@collect
                         visualCacheGeneration = progress.generation
-                        if (!restoreChanges(snapshot, index, indexJob, searchableText, inputs, unavailable,
+                        if (!restoreChanges(snapshot, index, photoIndexRestoration.textJob, searchableText, inputs, unavailable,
                                 progress.textUpdated.filterValues { it > textCacheGeneration }.keys)) return@collect
                         textCacheGeneration = progress.generation
                     } catch (_: PhotoIndexUnavailable) {
@@ -390,14 +402,25 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     fun closeReview() {
         if (state.value.savingSubject) return
         suggestionJob?.cancel()
-        mutableState.update { it.copy(review = it.review.copy(open = false, scanning = false, selected = null), namingError = null) }
+        mutableState.update { it.copy(review = it.review.copy(open = false, scanning = false, selected = null, selectedGroup = emptyList()), namingError = null) }
     }
 
     fun chooseSuggestion(suggestion: NameSuggestion) {
         mutableState.update { current ->
             if (!current.review.open || current.loading || current.savingSubject ||
                 suggestion !in current.review.candidates || suggestion.isConfirmed(current.named)
-            ) current else current.copy(review = current.review.copy(selected = suggestion), namingError = null)
+            ) current else current.copy(review = current.review.copy(selected = suggestion, selectedGroup = emptyList()), namingError = null)
+        }
+    }
+
+    fun chooseSuggestionGroup(suggestions: List<NameSuggestion>) {
+        if (suggestions.size !in 2..12 || suggestions.distinctBy { it.photo.uri }.size != suggestions.size) return
+        val first = suggestions.first()
+        if (suggestions.any { it.detection.kind != first.detection.kind || it.detection.label != first.detection.label }) return
+        mutableState.update { current ->
+            if (!current.review.open || current.loading || current.savingSubject ||
+                suggestions.any { it !in current.review.candidates || it.isConfirmed(current.named) }
+            ) current else current.copy(review = current.review.copy(selected = first, selectedGroup = suggestions.toList()), namingError = null)
         }
     }
 
@@ -434,7 +457,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun dismissSubjects() {
-        mutableState.update { if (it.savingSubject) it else it.copy(naming = false, review = it.review.copy(selected = null)) }
+        mutableState.update { if (it.savingSubject) it else it.copy(naming = false, review = it.review.copy(selected = null, selectedGroup = emptyList())) }
     }
 
     fun openMatchingQuery() {
@@ -590,12 +613,22 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         }
     }
 
-    fun confirmIdentity(photo: RankedPhoto) {
+    fun confirmIdentity(photo: RankedPhoto) = confirmIdentities(listOf(photo))
+
+    fun confirmIdentities(selected: List<RankedPhoto>) {
         val current = state.value
         val review = current.identity ?: return
-        if (review.editingRejection || photo !in review.visibleSuggestions(current.named.photosOf(setOf(review.subject.id)))) return
-        changeSubject(ranked = photo) { source, _ ->
-            context.photoSubjects.confirm(source, SubjectSelection.Existing(review.subject.id), photo.region, photo.revision)
+        if (review.editingRejection || review.scanning || selected.isEmpty() ||
+            selected.distinctBy { it.photo.uri }.size != selected.size) return
+        val visible = review.visibleSuggestions(current.named.photosOf(setOf(review.subject.id))).toSet()
+        if (selected.any { it !in visible || it.photo.uri !in current.indexedUris }) return
+        val sources = current.photos.associateBy { it.uri }
+        val references = selected.map { match ->
+            val source = sources[match.photo.uri] ?: return
+            SubjectReferenceSelection(source, match.region, match.revision)
+        }
+        changeSubject(ranked = selected.first(), skipStaleRanked = selected.size == 1) { _, _ ->
+            context.photoSubjects.confirmAll(SubjectSelection.Existing(review.subject.id), references)
         }
     }
 
@@ -603,8 +636,15 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         mutableState.update { state -> state.identity?.let { state.copy(identity = change(it)) } ?: state }
     }
 
-    fun confirmSubject(choice: SubjectSelection, region: PhotoRegion?) = changeSubject(newName = choice as? SubjectSelection.New) { photo, suggestion ->
-        context.photoSubjects.confirm(photo, choice, region, suggestion?.revision)
+    fun confirmSubject(choice: SubjectSelection, region: PhotoRegion?) {
+        val group = state.value.review.selectedGroup
+        changeSubject(newName = choice as? SubjectSelection.New) { photo, suggestion ->
+            if (group.isEmpty()) context.photoSubjects.confirm(photo, choice, region, suggestion?.revision)
+            else context.photoSubjects.confirmAll(choice, group.mapIndexed { index, candidate ->
+                if (index == 0) SubjectReferenceSelection(photo, region, candidate.revision)
+                else SubjectReferenceSelection(candidate.photo, candidate.detection.region, candidate.revision)
+            })
+        }
     }
 
     fun removeDatedAlias(alias: DatedSubjectAlias) = changeSubject { _, _ ->
@@ -620,10 +660,12 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private fun changeSubject(
         ranked: RankedPhoto? = null,
         newName: SubjectSelection.New? = null,
+        skipStaleRanked: Boolean = true,
         action: suspend (SelectedPhoto, NameSuggestion?) -> Confirmation,
     ) {
         val current = state.value
         val suggestion = current.review.selected
+        val suggestionGroup = current.review.selectedGroup
         val uri = ranked?.photo?.uri ?: suggestion?.photo?.uri ?: current.opened
         val photo = current.photos.firstOrNull { it.uri == uri } ?: return
         if (current.loading || current.savingSubject) return
@@ -643,7 +685,8 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                             named = named,
                             naming = it.naming && result != Confirmation.SAVED,
                             review = if (suggestion != null && result == Confirmation.SAVED) {
-                                it.review.copy(selected = null, candidates = it.review.candidates - suggestion)
+                                it.review.copy(selected = null, selectedGroup = emptyList(),
+                                    candidates = it.review.candidates - (suggestionGroup + suggestion).toSet())
                             } else it.review,
                             savingSubject = false,
                             searching = false,
@@ -660,7 +703,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                     refreshSearchResults()
                     if (result == Confirmation.SAVED && newName != null) {
                         subjectForReview(newName.name, named)?.let(::openIdentity)
-                    } else if (result == Confirmation.PHOTO_CHANGED && ranked != null) {
+                    } else if (result == Confirmation.PHOTO_CHANGED && ranked != null && skipStaleRanked) {
                         skipIdentity(ranked)
                     }
                 } catch (_: PhotoIndexUnavailable) {
@@ -677,8 +720,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     private fun reload(scheduleIndexing: Boolean = true, recheckIndex: Boolean = false, change: (() -> Int?)? = null) {
         viewModelScope.launch {
             operations.withLock {
-                indexJob?.cancel()
-                visualJob?.cancel()
+                photoIndexRestoration.cancel()
                 inputSearchJob?.cancel()
                 queries.cancel()
                 suggestionJob?.cancel()
@@ -755,15 +797,11 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                     )
                     clearSearchResults(withIndexedPhotos(updated))
                 }
-                val textRestored = CompletableDeferred<Unit>()
-                val visualRestored = CompletableDeferred<Unit>()
-                indexPhotos(photos, unavailable, textRestored)
-                if (context.clip.available) indexVisualContents(photos, unavailable, visualRestored)
-                else visualRestored.complete(Unit)
+                val restoration = photoIndexRestoration.start(photos, unavailable)
                 refreshSearchResults()
                 identityMaintenanceJob = viewModelScope.launch {
-                    textRestored.await()
-                    visualRestored.await()
+                    restoration.text.await()
+                    restoration.visual.await()
                     try {
                         withContext(Dispatchers.IO) {
                             context.identityMatcher.reconcile(photos, unavailable)
@@ -787,78 +825,6 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                 }
             }
         }
-    }
-
-    private fun indexPhotos(photos: List<SelectedPhoto>, unavailable: UnavailableSources, restored: CompletableDeferred<Unit>) {
-        val snapshot = PhotoSourceSnapshot.capture(state.value)
-        indexJob = viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    index.refresh(
-                        photos = photos.map { IndexPhoto(it.uri, it.sourceRevision) },
-                        restore = { saved, pending -> withContext(Dispatchers.Main.immediate) restoreText@{
-                            if (!snapshot.matches(state.value)) return@restoreText
-                            searchableText.putAll(saved)
-                            mutableState.update { withIndexedPhotos(it.copy(restoringIndex = false, indexing = pending > 0, textIndexed = saved.size)) }
-                            if (state.value.searchMode != SearchMode.NAMED) refreshSearchResults()
-                            restored.complete(Unit)
-                        } },
-                        processUris = emptySet(),
-                        unavailable = unavailable,
-                    ) { uri, text ->
-                        if (text != null) withContext(Dispatchers.Main.immediate) publishText@{
-                            if (!snapshot.matches(state.value)) return@publishText
-                            searchableText[uri] = text
-                            mutableState.update { withIndexedPhotos(it.copy(textIndexed = searchableText.size)) }
-                            if (state.value.searchMode != SearchMode.NAMED) refreshSearchResults()
-                        }
-                    }
-                }
-                if (snapshot.matches(state.value)) mutableState.update { it.copy(restoringIndex = false, indexing = false) }
-            } catch (_: PhotoIndexUnavailable) {
-                if (snapshot.matches(state.value)) mutableState.update {
-                    it.copy(restoringIndex = false, indexing = false, notice = R.string.library_index_unavailable)
-                }
-            }
-        }.also { job -> job.invokeOnCompletion { restored.complete(Unit) } }
-    }
-
-    private fun indexVisualContents(photos: List<SelectedPhoto>, unavailable: UnavailableSources, restored: CompletableDeferred<Unit>) {
-        val snapshot = PhotoSourceSnapshot.capture(state.value)
-        visualJob = viewModelScope.launch {
-            try {
-                withContext(Dispatchers.IO) {
-                    context.visualIndex.refresh(
-                        photos = photos.map { IndexPhoto(it.uri, it.sourceRevision) },
-                        restore = { saved, pending -> withContext(Dispatchers.Main.immediate) restoreVisual@{
-                            if (!snapshot.matches(state.value)) return@restoreVisual
-                            embeddings.putAll(saved)
-                            mutableState.update { withIndexedPhotos(it.copy(visualIndexing = pending > 0, visualIndexed = saved.size)) }
-                            prepareTextSearch()
-                            refreshSearchResults()
-                            restored.complete(Unit)
-                        } },
-                        processUris = emptySet(),
-                        unavailable = unavailable,
-                    ) { uri, vector ->
-                        if (vector != null) withContext(Dispatchers.Main.immediate) publishVisual@{
-                            if (!snapshot.matches(state.value)) return@publishVisual
-                            embeddings[uri] = vector
-                            mutableState.update { withIndexedPhotos(it.copy(visualIndexed = embeddings.size)) }
-                            refreshSearchResults()
-                        }
-                    }
-                }
-                if (snapshot.matches(state.value)) {
-                    mutableState.update { it.copy(visualIndexing = false) }
-                    scheduleVisualSearch()
-                }
-            } catch (_: PhotoIndexUnavailable) {
-                if (snapshot.matches(state.value)) mutableState.update {
-                    it.copy(visualIndexing = false, notice = R.string.library_visual_unavailable)
-                }
-            }
-        }.also { job -> job.invokeOnCompletion { restored.complete(Unit) } }
     }
 
     private fun scheduleVisualSearch(ifIdle: Boolean = false) {

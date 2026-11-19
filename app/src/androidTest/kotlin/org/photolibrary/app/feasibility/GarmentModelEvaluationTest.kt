@@ -16,13 +16,13 @@ import org.junit.runner.RunWith
 import org.photolibrary.app.PhotoLibraryApplication
 import org.photolibrary.app.detection.GarmentModels
 import org.photolibrary.app.detection.GarmentOverlapPolicy
-import org.photolibrary.app.detection.LitertGarmentParser
 import org.photolibrary.app.detection.PersonGarmentEvidence
 import org.photolibrary.app.detection.area
 import org.photolibrary.app.detection.describePersonGarment
 import org.photolibrary.app.detection.intersection
 import org.photolibrary.app.library.PHOTO_REFERENCE_EDGE
 import org.photolibrary.app.library.decodePhoto
+import org.photolibrary.app.models.ModelFileStore
 import org.photolibrary.app.subjects.PhotoRegion
 import org.photolibrary.app.subjects.SubjectKind
 
@@ -41,7 +41,8 @@ class GarmentModelEvaluationTest {
         val root = File(context.filesDir, fixture)
         val manifestBytes = File(root, "manifest.json").readBytes()
         val manifest = JSONObject(manifestBytes.toString(Charsets.UTF_8))
-        assertEquals(LitertGarmentParser.SHA256, manifest.getString("parser_sha256"))
+        val modelFiles = ModelFileStore.bundled(context.assets)
+        assertEquals(modelFiles.sha256("garment/selfie_multiclass_256x256.tflite"), manifest.getString("parser_sha256"))
         assertEquals(PHOTO_REFERENCE_EDGE, manifest.getInt("max_image_edge"))
         val reports = JSONArray()
         val setupStarted = SystemClock.elapsedRealtime()

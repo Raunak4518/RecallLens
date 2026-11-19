@@ -7,6 +7,8 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.security.KeyStore
 import java.util.UUID
 import kotlinx.coroutines.runBlocking
@@ -24,10 +26,13 @@ import org.photolibrary.app.library.PhotoEvidenceValidation
 import org.photolibrary.app.library.PhotoLibrary
 import org.photolibrary.app.library.PhotoLocations
 import org.photolibrary.app.library.SelectedPhoto
+import org.photolibrary.app.library.UnavailableSources
 import org.photolibrary.app.semantic.PhotoEmbedding
+import org.photolibrary.app.semantic.ResidualVisualRanker
 import org.photolibrary.app.subjects.NamedLibrary
 import org.photolibrary.app.subjects.NamedSearch
 import org.photolibrary.app.subjects.NamedSubject
+import org.photolibrary.app.subjects.PhotoQueryPlan
 import org.photolibrary.app.subjects.SubjectKind
 import org.photolibrary.app.subjects.SubjectReference
 import org.photolibrary.app.subjects.planPhotoQuery
@@ -37,6 +42,29 @@ class PhotoContentSearchTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val app = instrumentation.targetContext.applicationContext as PhotoLibraryApplication
     private val resolver = app.contentResolver
+
+    @Test
+    fun residualRerankerOnlyChangesUnscopedSingleVectorVisualResults() = fixture {
+        val weights = ByteBuffer.allocate(80 + 2 * 512 * Float.SIZE_BYTES).order(ByteOrder.LITTLE_ENDIAN)
+        weights.put("PLR1".encodeToByteArray()).putInt(512).putInt(1).putInt(5).position(80)
+        weights.putFloat(1f)
+        weights.putFloat(80 + 513 * Float.SIZE_BYTES, 2f)
+        val trained = ResidualVisualRanker.decode(weights.array(), "0".repeat(64))
+        val inputs = photos.associate { photo ->
+            val position = when (photo.uri) {
+                anchor -> 0
+                near -> 1
+                else -> 2
+            }
+            photo.uri to PhotoEmbedding.normalized(FloatArray(512).apply { this[position] = 1f })
+        }
+        val route = engine(trained)
+        val plain = PhotoQueryPlan(named = null)
+        assertEquals(near, route.search(plain, photos, inputs) { vector }.related.first())
+        assertEquals(anchor, route.search(plain.copy(relatedScope = inputs.keys), photos, inputs) { vector }.related.first())
+        val variants = route.searchVariants(plain, photos, inputs, UnavailableSources.NONE) { listOf(vector, vector) }
+        assertEquals(anchor, variants.related.first())
+    }
 
     @Test
     fun nearbyRankingUsesConfirmedIntersectionAndEncryptedCoordinatesAcrossReopen() = fixture {
@@ -154,7 +182,7 @@ class PhotoContentSearchTest {
             add(SubjectReference(1, inserted[4], "person", null))
         })
 
-        fun engine() = PhotoContentSearch(PhotoLocations(app, library, cache, { allowed }) { photo ->
+        fun engine(reranker: ResidualVisualRanker? = null) = PhotoContentSearch(PhotoLocations(app, library, cache, { allowed }) { photo ->
             reads++
             when (inserted.indexOf(photo.uri)) {
                 0 -> PhotoCoordinates(21.1702, 72.8311)
@@ -162,7 +190,7 @@ class PhotoContentSearchTest {
                 2 -> PhotoCoordinates(23.0, 72.8311)
                 else -> null
             }
-        }, PhotoEvidenceValidation(library))
+        }, PhotoEvidenceValidation(library), reranker)
 
         suspend fun prepare() {
             repeat(6) {

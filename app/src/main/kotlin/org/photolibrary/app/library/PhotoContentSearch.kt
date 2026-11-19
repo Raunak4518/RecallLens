@@ -4,6 +4,7 @@ import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.photolibrary.app.semantic.PhotoEmbedding
+import org.photolibrary.app.semantic.ResidualVisualRanker
 import org.photolibrary.app.subjects.NamedSearch
 import org.photolibrary.app.subjects.PhotoQueryPlan
 
@@ -11,7 +12,11 @@ internal data class ContentSearchResults(val related: List<Uri>, val location: N
     val visualScores: Map<Uri, Float> = emptyMap(),
 )
 
-internal class PhotoContentSearch(private val locations: PhotoLocations, private val validation: PhotoEvidenceValidation) {
+internal class PhotoContentSearch(
+    private val locations: PhotoLocations,
+    private val validation: PhotoEvidenceValidation,
+    private val reranker: ResidualVisualRanker? = null,
+) {
     suspend fun search(
         plan: PhotoQueryPlan,
         photos: List<SelectedPhoto>,
@@ -36,7 +41,11 @@ internal class PhotoContentSearch(private val locations: PhotoLocations, private
         if (embeddings.isEmpty() || scope?.isEmpty() == true) return ContentSearchResults(emptyList(), location)
         val vectors = encodeQueries()
         val candidates = withContext(Dispatchers.Default) { rankVisualVariants(vectors, embeddings, 100, eligible) }
-        val ranked = candidates.map { it.uri }
+        val baseline = candidates.map { it.uri }
+        val query = vectors.singleOrNull()
+        val ranked = if (plan.canRankContents && scope == null && nearby == null && query != null && reranker != null) {
+            withContext(Dispatchers.Default) { reranker.reorder(query, baseline, embeddings) }
+        } else baseline
         val scores = candidates.associate { it.uri to it.score }
         if (nearby == null) return ContentSearchResults(ranked, visualScores = scores)
         val required = ranked.toSet() + nearby.anchors

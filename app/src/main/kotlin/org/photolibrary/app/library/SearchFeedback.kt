@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -13,7 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -75,6 +80,13 @@ internal class SearchFeedback(private val store: FeedbackStore, private val scop
         } else {
             applyJudgment()
         }
+    }
+
+    fun rating(query: String, photo: SelectedPhoto): Boolean? {
+        val key = feedbackQueryKey(query)
+        return (history.judgments + session).lastOrNull {
+            it.query == key && it.source == photo.uri.toString() && it.revision == photo.sourceRevision.orEmpty()
+        }?.positive
     }
 
     fun reason(reason: FeedbackReason) {
@@ -205,21 +217,32 @@ private fun FeedbackReason.label() = when (this) {
 }
 
 @Composable
-internal fun ResultFeedbackMenu(feedback: SearchFeedback, query: String, photo: SelectedPhoto, features: () -> FeedbackFeatures) {
-    var expanded by remember(photo.uri, query) { mutableStateOf(false) }
-    androidx.compose.foundation.layout.Box {
-        TextButton(onClick = { expanded = true }, enabled = !feedback.busy) {
-            Text(stringResource(R.string.feedback_result))
+internal fun ResultFeedbackControls(feedback: SearchFeedback, query: String, photo: SelectedPhoto, features: () -> FeedbackFeatures) {
+    val rating = feedback.rating(query, photo)
+    val foundDescription = stringResource(R.string.feedback_found)
+    val wrongDescription = stringResource(R.string.feedback_wrong)
+    Row {
+        IconButton(
+            onClick = { feedback.mark(query, photo, true, features()) },
+            enabled = !feedback.busy,
+            modifier = androidx.compose.ui.Modifier.semantics { contentDescription = foundDescription },
+        ) {
+            androidx.compose.material3.Icon(
+                painterResource(R.drawable.ic_feedback_positive),
+                contentDescription = foundDescription,
+                tint = if (rating == true) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            DropdownMenuItem(text = { Text(stringResource(R.string.feedback_wrong)) }, onClick = {
-                expanded = false
-                feedback.mark(query, photo, false, features())
-            })
-            DropdownMenuItem(text = { Text(stringResource(R.string.feedback_found)) }, onClick = {
-                expanded = false
-                feedback.mark(query, photo, true, features())
-            })
+        IconButton(
+            onClick = { feedback.mark(query, photo, false, features()) },
+            enabled = !feedback.busy,
+            modifier = androidx.compose.ui.Modifier.semantics { contentDescription = wrongDescription },
+        ) {
+            androidx.compose.material3.Icon(
+                painterResource(R.drawable.ic_feedback_negative),
+                contentDescription = wrongDescription,
+                tint = if (rating == false) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

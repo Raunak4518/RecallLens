@@ -13,16 +13,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import org.photolibrary.app.R
@@ -40,6 +47,7 @@ internal data class IdentityActions(
     val undoRejection: () -> Unit = {},
     val editGroup: (SubjectGroupChange) -> Unit = {},
     val undoGroupEdit: () -> Unit = {},
+    val confirmBatch: (List<RankedPhoto>) -> Unit,
 )
 
 @Composable
@@ -52,6 +60,8 @@ internal fun IdentityReviewScreen(
     val confirmedIds = state.named.photosOf(setOf(review.subject.id))
     val confirmed = state.indexedPhotos.filter { it.uri in confirmedIds }
     val candidates = review.visibleSuggestions(confirmedIds).filter { it.photo.uri in state.indexedUris }
+    var selected by remember(review.subject.id, candidates) { mutableStateOf(emptySet<RankedPhoto>()) }
+    val ready = !state.loading && !state.savingSubject && !review.editingRejection && !review.scanning
     TextButton(onClick = actions.close) { Text(stringResource(R.string.identity_back)) }
     Text(review.subject.name, style = MaterialTheme.typography.headlineSmall)
     if (review.scanning) {
@@ -65,7 +75,12 @@ internal fun IdentityReviewScreen(
         }
     }
     IdentityGroupControls(state, review, confirmed, actions, loadImage)
-    state.namingError?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
+    state.namingError?.let {
+        Text(stringResource(it), color = MaterialTheme.colorScheme.error)
+        if (it == R.string.subject_photo_changed) {
+            TextButton(onClick = actions.scan, enabled = ready) { Text(stringResource(R.string.suggestions_retry)) }
+        }
+    }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item { Text(stringResource(R.string.identity_confirmed_count, confirmed.size), style = MaterialTheme.typography.titleMedium) }
         items(confirmed, key = { "confirmed${it.uri}" }) { photo ->
@@ -76,6 +91,11 @@ internal fun IdentityReviewScreen(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(stringResource(R.string.identity_possible), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.identity_hint), style = MaterialTheme.typography.bodyMedium)
+                if (selected.isNotEmpty()) {
+                    Button(onClick = { actions.confirmBatch(candidates.filter { it in selected }) }, enabled = ready) {
+                        Text(stringResource(R.string.identity_confirm_selected, selected.size))
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (limit in suggestionLimits) {
                         FilterChip(review.limit == limit, onClick = { actions.limit(limit) },
@@ -94,7 +114,12 @@ internal fun IdentityReviewScreen(
         }
         items(candidates, key = { "candidate${it.photo.uri}" }) { match ->
             IdentityPhoto(match.photo, match.region, state.imageRevision, loadImage) {
-                Button(onClick = { actions.confirm(match) }, enabled = !state.savingSubject && !review.editingRejection) {
+                val selectionLabel = stringResource(R.string.identity_select_candidate,
+                    match.photo.name ?: stringResource(R.string.library_unnamed))
+                Checkbox(checked = match in selected, enabled = ready,
+                    onCheckedChange = { checked -> selected = if (checked) selected + match else selected - match },
+                    modifier = Modifier.semantics { contentDescription = selectionLabel })
+                Button(onClick = { actions.confirm(match) }, enabled = ready) {
                     Text(stringResource(R.string.identity_confirm))
                 }
                 TextButton(onClick = { actions.reject(match) }, enabled = !state.savingSubject && !review.editingRejection) {

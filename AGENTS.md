@@ -1,27 +1,22 @@
 # Agent handoff
 
-Start with [README.md](README.md), then [planning overview](docs/README.md). This is the Android photo-library project, not CueSeal.
+Start with [README.md](README.md) and the [active Android search plan](docs/final-android-search-plan.md). Use A01–A13 and O01–O12 from that plan for prerequisites and completion evidence. Check current code, build output and test results before declaring work complete.
 
-## Task control
+This checkout's active product is a standalone, phone-local Android photo search app. The cloud design in [blueprint.md](docs/blueprint.md), its service code and hybrid checklist describe a separate system and do not define Android app requirements. Do not add cloud transport, account requirements, remote inference or upload behavior to the Android app. Preserve imported legacy evidence only with its original provenance and never label it as locally produced.
 
-- Use IDs and dependencies from [implementation checklist](docs/implementation-todo.md).
-- Check actual files, device results and test evidence before declaring a task complete. The launch scaffold is the first Android toolchain check for PL014.
-- Preserve user changes. The old project at `D:/secure audio` is separate; do not modify or import it as part of routine photo-app work.
-- Record task IDs, changed paths, tested device/model/build versions, checks/results and remaining dependencies in each handoff.
+## Active Android requirements
 
-## Fixed product requirements
-
-- Android first. The client uses Kotlin and Jetpack Compose.
-- Account-free local indexing/search works without uploading photos, OCR, embeddings or queries.
-- Support LOCAL, CLOUD_FULL and CLOUD_REDACTED with explicit exact-artifact consent. Redaction failure must never trigger full-image upload.
-- Ordinary cloud workers decrypt approved inputs. Do not claim server-blind computation or perfect redaction.
-- Encrypt sensitive derived state, protect keys and handle edit/move/trash/delete/revoked access plus late-result races.
-- Build the encoder/OCR baseline first. LLM/VLM comparison remains a required later phase; deployment and fine-tuning depend on evidence.
+- Kotlin and Jetpack Compose.
+- The user searches accessible phone photos with a prompt. Indexing, inference, personalization and retrieval work offline without an account.
+- Keep photos on-device. The app has no cloud upload, service dependency or remote fallback.
+- Encrypt sensitive derived index data and protect keys with Android Keystore.
+- Preserve correct access and revision handling for edit, move, trash, deletion, permission changes, interruption and restart.
+- Keep model implementations replaceable through task-specific interfaces. Compare models on common fixtures before promoting one. LLM/VLM candidates remain in the plan for later evaluation.
 
 ## Engineering
 
-Follow [blueprint](docs/blueprint.md) boundaries. Keep Android UI, media access, storage, inference, key handling and transport responsibilities separate without unnecessary abstraction layers. Use standard maintained cryptographic libraries.
+Follow the boundaries in the active plan. Keep UI, media access, storage, inference and search responsibilities separate without unnecessary layers. Use standard maintained cryptographic libraries.
 
-Do not add source-code comments. Put rationale in documentation. Use licensed/owned fixtures; keep private photos, OCR, embeddings, keys, tokens, signing credentials, local SDK paths, downloaded corpora and raw logs out of commits.
+Do not add source-code comments. Put rationale in documentation. Use licensed or owned fixtures. Keep private photos, OCR, embeddings, keys, tokens, signing credentials, local SDK paths, downloaded corpora and raw logs out of commits.
 
-Use the Windows build and device commands in [README.md](README.md). Run meaningful tests appropriate to each change and validate on physical Android hardware for memory, battery and inference claims.
+Use the Windows build commands in [README.md](README.md). Complete the planned implementation pass before executing the full runtime and instrumentation test suites. For physical-device memory, battery, thermal and inference claims, record device and model details. Record task IDs, changed paths, build/test commands, results and outstanding dependencies in the handoff.

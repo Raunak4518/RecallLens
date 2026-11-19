@@ -1,7 +1,7 @@
 <resources>
     <string name="feedback_learning">Search learning</string>
-    <string name="feedback_learning_off">Allow this phone to save future result ratings and the searches they belong to in the encrypted index. Similar searches may use these ratings to change their order. With learning off, ratings last only for the current search.</string>
-    <string name="feedback_learning_on">This phone uses your saved ratings to personalize results. Turning learning off erases all saved search ratings and resets their ranking effects.</string>
+    <string name="feedback_learning_off">Ratings can adjust this search immediately. If you allow local learning, this phone saves ratings and their search context in the encrypted index and uses them to improve future ranking. Photos and ratings stay on this device and are not uploaded. With learning off, ratings last only for the current search.</string>
+    <string name="feedback_learning_on">This phone uses your saved ratings to personalize future ranking locally. It does not retrain the image models or upload photos or ratings. Turning learning off erases saved search ratings and resets their ranking effects.</string>
     <string name="feedback_disable">Turn off and erase</string>
     <string name="feedback_enable">Allow local learning</string>
     <string name="feedback_unavailable">Saved feedback is unavailable. Check device storage and try again.</string>

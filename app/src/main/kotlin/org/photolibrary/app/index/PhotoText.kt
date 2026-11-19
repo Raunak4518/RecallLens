@@ -10,6 +10,7 @@ internal class TextLine(val text: String, val language: String, val bounds: Text
 internal class PhotoText(val lines: List<TextLine>, val complete: Boolean = true) {
     private val searchableLines by lazy { lines.map { " ${normalizePhotoText(it.text)} " } }
     val marksheetEvidence by lazy { readMarksheetEvidence(lines) }
+    val documentFields by lazy { readDocumentFields(lines) }
 
     fun matches(normalizedQuery: String): Boolean {
         if (normalizedQuery.isEmpty()) return false

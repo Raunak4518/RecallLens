@@ -12,7 +12,6 @@ import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
 import java.nio.FloatBuffer
-import java.nio.channels.FileChannel
 import java.security.DigestInputStream
 import java.security.MessageDigest
 import kotlin.math.ceil
@@ -20,12 +19,14 @@ import kotlin.math.floor
 import kotlin.math.sqrt
 import org.photolibrary.app.detection.DetectedRegion
 import org.photolibrary.app.index.PhotoProcessingException
+import org.photolibrary.app.models.ModelFileStore
 import org.photolibrary.app.subjects.PhotoRegion
 import org.photolibrary.app.subjects.SubjectKind
 
-internal class IdentityModels(private val assets: AssetManager) : IdentityModelFactory {
-    override fun available(kind: SubjectKind): Boolean = model(kind) in files
-    private val files by lazy { assets.list("identity").orEmpty().toSet() }
+internal class IdentityModels(private val modelFiles: ModelFileStore) : IdentityModelFactory {
+    constructor(assets: AssetManager) : this(ModelFileStore.bundled(assets))
+
+    override fun available(kind: SubjectKind): Boolean = model(kind)?.let { modelFiles.available("identity/$it") } == true
     private val faceFingerprint by lazy { fingerprint(listOf("identity/sface.onnx", "detection/yunet.onnx")) }
     private val objectFingerprint by lazy {
         fingerprint(listOf("identity/dinov2.onnx", "detection/yolox_nano.onnx", "detection/coco-labels.txt"))
@@ -41,7 +42,7 @@ internal class IdentityModels(private val assets: AssetManager) : IdentityModelF
 
     private fun fingerprint(paths: List<String>): String = paths.joinToString(":") { path ->
         val hash = MessageDigest.getInstance("SHA-256")
-        DigestInputStream(assets.open(path), hash).use { stream ->
+        DigestInputStream(modelFiles.open(path), hash).use { stream ->
             val buffer = ByteArray(64 * 1024)
             while (stream.read(buffer) >= 0) Unit
         }
@@ -55,11 +56,7 @@ internal class IdentityModels(private val assets: AssetManager) : IdentityModelF
             options.setIntraOpNumThreads(2)
             options.setInterOpNumThreads(1)
             options.setSessionLogLevel(ai.onnxruntime.OrtLoggingLevel.ORT_LOGGING_LEVEL_ERROR)
-            assets.openFd("identity/${model(kind)}").use { asset ->
-                asset.createInputStream().use {
-                    environment.createSession(it.channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, asset.length), options)
-                }
-            }
+            environment.createSession(modelFiles.map("identity/${model(kind)}"), options)
         }
         val runtime = IdentityRuntime(environment, session)
         when (kind) {

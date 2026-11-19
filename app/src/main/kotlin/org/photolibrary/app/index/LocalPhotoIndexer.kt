@@ -87,8 +87,10 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
         restore: suspend (Map<Uri, Output>, Int) -> Unit,
         processUris: Set<Uri>?,
         unavailable: UnavailableSources = UnavailableSources.NONE,
+        writeBatchSize: Int = 1,
         publish: suspend (Uri, Output?) -> Unit,
     ) = lock.withLock {
+        require(writeBatchSize in 1..32)
         openIndex().use { index ->
             val accessible = photos.mapTo(hashSetOf()) { it.uri }
             val read = processUris?.takeIf { it.isNotEmpty() } ?: accessible
@@ -117,11 +119,41 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
                     }
                 }
                 restore(ready, pendingCount)
-                for (photo in pending) {
+                var start = 0
+                while (start < pending.size) {
+                    val end = minOf(start + writeBatchSize, pending.size)
+                    val candidates = pending.subList(start, end)
+                    val batch = if (candidates.any { it.sourceRevision == null }) candidates.take(1) else candidates
+                    val prepared = batch.map { photo ->
+                        currentCoroutineContext().ensureActive()
+                        photo to preparePhoto(photo, records[photo.uri], revision, processor, index)
+                    }
+                    val results = prepared.map { (photo, record) ->
+                        currentCoroutineContext().ensureActive()
+                        val current = record != null && if (photo.sourceRevision != null) {
+                            readRevision(photo.uri) == photo.sourceRevision
+                        } else {
+                            currentPixelRevision(photo.uri, revision.maxImageEdge) == record.pixelRevision
+                        }
+                        if (!current && record != null) index.remove(photo.uri)
+                        photo.uri to record.takeIf { current }
+                    }
                     currentCoroutineContext().ensureActive()
-                    val output = indexPhoto(photo, records[photo.uri], revision, processor, index)
-                    currentCoroutineContext().ensureActive()
-                    publish(photo.uri, output)
+                    val writes = results.mapNotNull { (uri, record) -> record?.let { uri to it } }
+                    tracePhotoStage("photos.index.save") {
+                        if (writes.size == 1) {
+                            val (uri, record) = writes.single()
+                            index.save(uri, record)
+                        } else if (writes.isNotEmpty()) index.saveBatch(writes)
+                    }
+                    for ((uri, record) in results) {
+                        currentCoroutineContext().ensureActive()
+                        if (record != null && record.pixelRevision != null) {
+                            recentOutputs?.put(revision to record.pixelRevision, record.output)
+                        }
+                        publish(uri, record?.output)
+                    }
+                    start += batch.size
                 }
             } finally {
                 if (processor.isInitialized()) processor.value.close()
@@ -129,15 +161,18 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
         }
     }
 
-    private suspend fun indexPhoto(
+    private suspend fun preparePhoto(
         photo: IndexPhoto,
         previous: IndexedPhoto<Output>?,
         model: ModelRevision,
         processor: Lazy<PhotoProcessor<Output>>,
         index: PhotoIndexSession<Output>,
-    ): Output? {
+    ): IndexedPhoto<Output>? {
         val (uri, sourceRevision) = photo
-        val image = loadImage(uri, model.maxImageEdge) ?: return discard(index, uri)
+        val image = loadImage(uri, model.maxImageEdge) ?: run {
+            index.remove(uri)
+            return null
+        }
         val pixelRevision: String
         val output: Output
         try {
@@ -160,19 +195,7 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
             image.recycle()
         }
 
-        currentCoroutineContext().ensureActive()
-        val unchanged = if (sourceRevision != null) readRevision(uri) == sourceRevision
-            else currentPixelRevision(uri, model.maxImageEdge) == pixelRevision
-        currentCoroutineContext().ensureActive()
-        if (!unchanged) return discard(index, uri)
-        tracePhotoStage("photos.index.save") { index.save(uri, IndexedPhoto(sourceRevision, pixelRevision, model, output)) }
-        recentOutputs?.put(model to pixelRevision, output)
-        return output
-    }
-
-    private fun discard(index: PhotoIndexSession<Output>, uri: Uri): Output? {
-        index.remove(uri)
-        return null
+        return IndexedPhoto(sourceRevision, pixelRevision, model, output)
     }
 
     private suspend fun currentPixelRevision(uri: Uri, edge: Int): String? {

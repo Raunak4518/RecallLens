@@ -1,4 +1,6 @@
-# Private photo library with selective cloud assistance
+# Separate cloud-system blueprint: private photo library with selective cloud assistance
+
+This blueprint describes the separate hybrid/cloud system. It is not the active Android app plan. The Android phone app is local-only and is governed by [final-android-search-plan.md](final-android-search-plan.md). Do not couple the app to cloud services or transfer this blueprint's cloud requirements into its implementation.
 
 Version 4. Updated 18 November 2026, Asia/Calcutta; original plan dated 14 November.
 Status: working Kotlin/Compose implementation with scoped emulator acceptance; production qualification remains incomplete. Read execution-status.md for current source-specific receipts and remaining dependencies.

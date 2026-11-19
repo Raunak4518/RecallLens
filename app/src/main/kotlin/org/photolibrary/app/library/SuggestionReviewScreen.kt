@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -21,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateMapOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ internal data class SuggestionActions(
     val close: () -> Unit,
     val scanMore: () -> Unit,
     val choose: (NameSuggestion) -> Unit,
+    val chooseGroup: (List<NameSuggestion>) -> Unit,
     val skip: (NameSuggestion) -> Unit,
 )
 
@@ -69,11 +72,19 @@ internal fun SuggestionReviewScreen(
         }
     }
     val candidateSet = remember(candidates) { candidates.toHashSet() }
+    val excluded = remember { mutableStateMapOf<NameSuggestion, Boolean>() }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         for (group in grouped) {
             val current = group.filter { it in candidateSet }
             if (current.size > 1) item {
-                Text(stringResource(R.string.similar_regions, current.size), style = MaterialTheme.typography.titleSmall)
+                val selected = current.filterNot { excluded[it] == true }
+                Column {
+                    Text(stringResource(R.string.similar_regions, current.size), style = MaterialTheme.typography.titleSmall)
+                    Button(onClick = { actions.chooseGroup(selected) },
+                        enabled = selected.size >= 2 && !state.loading && !state.savingSubject) {
+                        Text(stringResource(R.string.suggestions_name_selected, selected.size))
+                    }
+                }
             }
             items(current) { suggestion ->
                 val region = suggestion.detection
@@ -91,6 +102,10 @@ internal fun SuggestionReviewScreen(
                                 Button(onClick = { actions.choose(suggestion) }) { Text(stringResource(R.string.suggestions_name)) }
                                 TextButton(onClick = { actions.skip(suggestion) }) { Text(stringResource(R.string.suggestions_skip)) }
                             }
+                        }
+                        if (current.size > 1) {
+                            Checkbox(checked = excluded[suggestion] != true, enabled = !state.savingSubject,
+                                onCheckedChange = { checked -> if (checked) excluded.remove(suggestion) else excluded[suggestion] = true })
                         }
                     }
                 }

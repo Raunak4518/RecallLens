@@ -1,5 +1,15 @@
 # Execution status
 
+## Public development snapshot, 19 November 2026
+
+This repository snapshot contains ongoing Android search, model evaluation and documentation changes. It is a collaboration checkpoint, not a release-qualified build; the integrated current source has not yet completed its fresh build and verification pass. Older run receipts below apply only to their recorded source and model hashes. The most recent phone report is that face/entity suggestions do not reliably persist or match the same person across visually different photos; investigate before describing cross-photo face grouping as working. Downloaded corpora, local model caches, private gallery data and build artifacts are excluded from the repository. Recheck local disk space before acquiring additional data.
+
+## Current code-first continuation, 19 November
+
+The improvement branch now has a core/full model-asset profile, APK-pinned specialist-pack installation, capability reporting, and `PhotoIndexRestoration` extracted from the gallery ViewModel. Seven model-pack instrumentation cases and typed document-field regressions are authored and included in the verifier. The latest changes have not been compiled or run. The current disk check showed about 0.77 GiB free on C: and 10.55 GiB on D:; inspect the configured Gradle cache before deciding build placement. No build directory or benchmark artifact was deleted.
+
+Garment cache revisions now derive from the trusted model catalog for the face detector, person detector and upper-clothing parser. Runtime loading checks mapped weights against catalog hashes, installed-pack verification keys include the canonical file path, and garment evaluation setup reads the selected parser hash from `.local-models`. An instrumentation regression checks that cache revisions track catalog entries. These changes are authored but unbuilt and unrun.
+
 The encrypted checkpoint transaction is integrated. Its isolated emulator workload ran 14% faster with identical outputs, and the resulting app passed five staged-indexing checks, 25 host checks, build and lint. This is a focused check on the final APK. The 27-check, 300-photo, and WorkManager receipts below cover the immediately preceding build. [Measured search and indexing results](search-processing-evaluation.md)
 
 The latest visual-first build passed 27 focused Android checks with zero skips and 25 host checks, plus build and lint. The single search prompt and processed-photo scope passed alongside marksheet retrieval, stage order, encrypted cache restore, pause and cancellation. The phone received the earlier marksheet build. The newer scheduler is verified on the emulator. See [search processing evaluation](search-processing-evaluation.md) and `app/build/staged-index-acceptance/receipt.json`.

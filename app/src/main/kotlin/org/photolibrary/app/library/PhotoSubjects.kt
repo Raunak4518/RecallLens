@@ -2,6 +2,7 @@ package org.photolibrary.app.library
 
 import android.net.Uri
 import org.photolibrary.app.index.NamedSubjectStore
+import org.photolibrary.app.index.NamedReferenceDraft
 import org.photolibrary.app.subjects.Confirmation
 import org.photolibrary.app.subjects.DatedSubjectAlias
 import org.photolibrary.app.subjects.IdentityRejection
@@ -42,11 +43,23 @@ internal class PhotoSubjects(private val library: PhotoReferenceSource, private 
         region: PhotoRegion?,
         requiredRevision: String? = null,
     ): Confirmation {
-        val current = library.referenceRevision(photo.uri) ?: return Confirmation.PHOTO_CHANGED
-        if (requiredRevision != null && current != requiredRevision) return Confirmation.PHOTO_CHANGED
-        if (photo.sourceRevision != null && current != "source:${photo.sourceRevision}") return Confirmation.PHOTO_CHANGED
-        val digest = library.contentDigest(photo.uri, current) ?: return Confirmation.PHOTO_CHANGED
-        return store.confirm(photo.uri, current, choice, region, digest)
+        return confirmAll(choice, listOf(SubjectReferenceSelection(photo, region, requiredRevision)))
+    }
+
+    suspend fun confirmAll(choice: SubjectSelection, selected: List<SubjectReferenceSelection>): Confirmation {
+        require(selected.size in 1..12 && selected.map { it.photo.uri }.distinct().size == selected.size)
+        val references = ArrayList<NamedReferenceDraft>(selected.size)
+        for ((photo, region, requiredRevision) in selected) {
+            val current = library.referenceRevision(photo.uri) ?: return Confirmation.PHOTO_CHANGED
+            if (requiredRevision != null && current != requiredRevision) return Confirmation.PHOTO_CHANGED
+            if (photo.sourceRevision != null && current != "source:${photo.sourceRevision}") return Confirmation.PHOTO_CHANGED
+            val digest = library.contentDigest(photo.uri, current) ?: return Confirmation.PHOTO_CHANGED
+            references.add(NamedReferenceDraft(photo.uri, current, region, digest))
+        }
+        for (reference in references) {
+            if (library.referenceRevision(reference.uri) != reference.revision) return Confirmation.PHOTO_CHANGED
+        }
+        return store.confirmAll(choice, references)
     }
 
     suspend fun editGroups(current: NamedLibrary, sourceId: Long, change: SubjectGroupChange): SubjectGroupResult {
@@ -82,3 +95,5 @@ internal class PhotoSubjects(private val library: PhotoReferenceSource, private 
     fun setSelf(subjectId: Long?) = store.setSelf(subjectId)
 
 }
+
+internal data class SubjectReferenceSelection(val photo: SelectedPhoto, val region: PhotoRegion?, val requiredRevision: String?)

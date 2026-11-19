@@ -18,6 +18,7 @@ import org.photolibrary.app.index.NamedSubjectStore
 import org.photolibrary.app.index.NamedContentProof
 import org.photolibrary.app.library.PhotoReferenceSource
 import org.photolibrary.app.library.PhotoSubjects
+import org.photolibrary.app.library.SubjectReferenceSelection
 import org.photolibrary.app.library.PhotoOrigin
 import org.photolibrary.app.library.SelectedPhoto
 import org.photolibrary.app.library.UnavailableSources
@@ -40,6 +41,40 @@ class NamedSubjectsTest {
     private val lookalike = Uri.parse("content://fixture/names/unconfirmed-similar-car")
     private val available = mapOf(first to "gallery:1", second to "gallery:2", lookalike to "gallery:3")
     private val region = PhotoRegion(.1f, .15f, .9f, .75f)
+
+    @Test
+    fun batchConfirmationSavesOnlySelectedRegionsAndRejectsAStaleBatch() = withStore { store, reopen, _ ->
+        runBlocking {
+            val revisions = available.mapValues { "source:${it.value}" }.toMutableMap()
+            val source = object : PhotoReferenceSource {
+                override suspend fun referenceRevision(uri: Uri) = revisions[uri]
+                override suspend fun contentDigest(uri: Uri, expectedRevision: String): String? =
+                    if (revisions[uri] == expectedRevision) "sha256-v1:${uri.lastPathSegment}" else null
+            }
+            val subjects = PhotoSubjects(source, store)
+            val photos = available.keys.associateWith { SelectedPhoto(it, "fixture.png", PhotoOrigin.FOLDER) }
+            val otherRegion = PhotoRegion(.3f, .2f, .8f, .85f)
+            val selected = listOf(
+                SubjectReferenceSelection(photos.getValue(first), region, revisions[first]),
+                SubjectReferenceSelection(photos.getValue(second), otherRegion, revisions[second]),
+            )
+            val name = SubjectSelection.New("My car", SubjectKind.OBJECT, listOf("My BMW"))
+            revisions[second] = "source:edited"
+            assertEquals(Confirmation.PHOTO_CHANGED, subjects.confirmAll(name, selected))
+            assertTrue(reopen().reconcile(revisions).subjects.isEmpty())
+            revisions[second] = "source:${available[second]}"
+            assertEquals(Confirmation.SAVED, subjects.confirmAll(name, selected))
+            val restored = reopen().reconcile(revisions)
+            assertEquals(NamedSearch.Matches(setOf(first, second)), searchNamed("my bmw", restored, true))
+            assertEquals(setOf(region, otherRegion), restored.references.map { it.region }.toSet())
+            assertTrue(restored.referencesIn(lookalike).isEmpty())
+            val saved = SubjectSelection.Existing(restored.subjects.single().id)
+            val next = SubjectReferenceSelection(photos.getValue(lookalike), region, revisions[lookalike])
+            revisions[lookalike] = "source:edited-lookalike"
+            assertEquals(Confirmation.PHOTO_CHANGED, subjects.confirmAll(saved, listOf(selected.first(), next)))
+            assertEquals(restored, reopen().reconcile(revisions))
+        }
+    }
 
     @Test
     fun overlappingDatedNamesAreRejectedAndRemovalIsScoped() = withStore { store, reopen, _ ->

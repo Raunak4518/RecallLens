@@ -4,13 +4,11 @@ import android.net.Uri
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.photolibrary.app.detection.GarmentModels
-import org.photolibrary.app.detection.OnnxPersonDetector
 import org.photolibrary.app.detection.OnnxRegionModels
 import org.photolibrary.app.detection.PersonGarmentEvidence
 import org.photolibrary.app.detection.describePersonGarment
 import org.photolibrary.app.index.GarmentDependencies
 import org.photolibrary.app.index.GarmentEvidenceStore
-import org.photolibrary.app.index.ModelRevision
 import org.photolibrary.app.index.pixelRevision
 import org.photolibrary.app.subjects.SubjectKind
 
@@ -30,8 +28,8 @@ internal class CachedGarmentAnalysis(
     private val verifiedStore = VerifiedGarmentEvidence(library, store)
     val available get() = models.available && detectors.available
     val dependencies get() = GarmentDependencies(
-        ModelRevision("yunet-face", "ebafce4e3c118d6554634be5c27ab333b4c047a9a8c3faf1d7cf93101c22f0f0:640:score0.85:nms0.30", 640),
-        OnnxPersonDetector.MODEL,
+        detectors.faceRevision,
+        models.personDetectorRevision,
         models.revision,
     )
 

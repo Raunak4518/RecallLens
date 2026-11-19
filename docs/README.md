@@ -1,10 +1,18 @@
-# Android private photo library: planning handoff
+# Photo-library planning archive
 
-Version 3 planning snapshot, dated 14 November 2026. The [project README](../README.md) tracks implementation evidence. The [hybrid implementation record](hybrid-implementation.md) tracks the current build.
+## Active Android scope
 
-The app searches photos already accessible on an Android phone and encrypts its private derived index. Users can keep processing local or explicitly approve selected full or locally redacted images for cloud processing.
+The current Android app is phone-local and offline. Its canonical design and task order are in the [final Android search plan](final-android-search-plan.md), with current implementation evidence in the [Android build handoff](android-search-build-handoff.md). The app has no cloud upload, service dependency or remote inference fallback.
 
-This is the photo-library project's working plan in its own folder. CueSeal remains separately at `D:/secure audio`; its application and tests are not evidence that this photo app works. Start from the [project README](../README.md) for workspace status and [development setup](development-setup.md) for the framework recommendation.
+This document and the hybrid blueprint below are historical planning materials for a separate cloud system. They do not define the Android app's active scope. Keep the phone and cloud systems separate. CueSeal remains a different project at `D:/secure audio`; its source and test results are not evidence for the photo app.
+
+## Historical hybrid plan snapshot
+
+Version 3 planning snapshot, dated 14 November 2026. The [project README](../README.md) tracks implementation evidence. The [hybrid implementation record](hybrid-implementation.md) tracks the separate service integration work.
+
+The archived hybrid proposal covered local search plus explicitly approved full-image and locally redacted cloud processing. Consult it only for the separate service system, not for Android app requirements.
+
+Start from the [project README](../README.md) for workspace status and [development setup](development-setup.md) for framework and build instructions.
 
 ## Read in this order
 
@@ -13,8 +21,9 @@ For current execution, also read the [implementation handoff](next-implementatio
 1. [Blueprint](blueprint.md): objective, Android architecture, three modes, cryptography, security and lifecycle behaviour.
 2. [Complete dependency checklist](implementation-todo.md): 184 planned core/product tasks and 8 optional extension-entry tasks, with direct prerequisites and completion evidence.
 3. [Model and evaluation plan](model-and-evaluation-plan.md): baseline models, required later LLM/VLM comparison, data budgets and measured selection criteria.
-4. [Product roadmap](product-roadmap.md): staged working versions through production, Play distribution and paid-service readiness.
-5. [Research and decisions](research-and-decisions.md): primary sources, existing systems, corrections, constraints and unresolved evidence.
+4. [GPU model-quality evaluation results](model-quality-evaluation-results.md): full model comparison, CLIP text-graph precision sweep and phone-runtime boundaries.
+5. [Product roadmap](product-roadmap.md): staged working versions through production, Play distribution and paid-service readiness.
+6. [Research and decisions](research-and-decisions.md): primary sources, existing systems, corrections, constraints and unresolved evidence.
 
 ## Fixed decisions
 

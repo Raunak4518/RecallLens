@@ -79,6 +79,30 @@ class LocalPhotoIndexerTest {
     }
 
     @Test
+    fun batchRechecksEarlierSourcesAndCommitsBeforePublishing() = runBlocking {
+        val sources = (1..3).map { Uri.parse("content://fixture/batch/$it") }
+        val revisions = sources.associateWith { "source:original" }.toMutableMap()
+        var inference = 0
+        val index = LocalPhotoIndexer(
+            loadImage = { _, _ -> solid(Color.WHITE) },
+            createProcessor = {
+                processor("text") {
+                    if (++inference == 3) revisions[sources.first()] = "source:changed"
+                }
+            },
+            openIndex = { memoryIndex },
+            readRevision = { revisions[it] },
+        )
+        val published = mutableListOf<String?>()
+        index.refresh(sources.map { IndexPhoto(it, revisions.getValue(it)) }, { _, _ -> },
+            processUris = sources.toSet(), writeBatchSize = 3) { _, output ->
+            assertEquals(sources.drop(1).toSet(), memoryIndex.reconcile(sources.toSet()).keys)
+            published += output
+        }
+        assertEquals(listOf(null, "text", "text"), published)
+    }
+
+    @Test
     fun cancellationDuringInferencePreventsPublishAndCacheReuse() = runBlocking {
         var inferenceCalls = 0
         var published = false

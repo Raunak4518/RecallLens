@@ -25,6 +25,9 @@ internal interface PhotoIndexSession<Output> : AutoCloseable {
     fun current(accessible: Map<Uri, String?>, model: ModelRevision, unavailable: UnavailableSources): Set<Uri> =
         current(accessible, model)
     fun save(uri: Uri, photo: IndexedPhoto<Output>)
+    fun saveBatch(records: List<Pair<Uri, IndexedPhoto<Output>>>) {
+        for ((uri, photo) in records) save(uri, photo)
+    }
     fun remove(uri: Uri)
     fun remove(uri: Uri, expectedRevision: String?, expectedModel: ModelRevision): Boolean = false
 }

@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PHOTOS = ROOT / "app" / "build" / "public-evaluation" / "selective-ocr"
 DESTINATION = ROOT / "app" / "build" / "garment-evaluation" / "device"
+PARSER_MODEL = ROOT / ".local-models" / "garment" / "selfie_multiclass_256x256.tflite"
 
 
 def main():
@@ -65,7 +66,7 @@ def main():
                 raise ValueError("Missing color labels")
     payload = {
         "evaluation_only": True,
-        "parser_sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+        "parser_sha256": hashlib.sha256(PARSER_MODEL.read_bytes()).hexdigest(),
         "max_image_edge": 1600,
         "corpus_manifest_sha256": hashlib.sha256((PHOTOS / "manifest.json").read_bytes()).hexdigest(),
         "cohort_sha256": hashlib.sha256(args.cohort.read_bytes()).hexdigest() if args.cohort else None,

@@ -16,7 +16,15 @@ The detectors run through the existing ONNX Runtime. The staging tool pins model
 
 ## Ranked review for a saved identity
 
+In **Name suggestions**, candidate regions are grouped as **Possible same subject** for comparison. These are model proposals, not confirmed identities. Uncheck regions that belong to a different subject, then select **Name N selected**. The name editor opens once for the selected group. The app preserves each selected region and checks every original again before saving the links to one entity in a single encrypted transaction. If a selected photo changed or lost access, the batch is rejected. Individual naming remains available from each suggestion.
+
+The grouping policy separates kinds and detector labels, uses the minimum similarity from a candidate to every region already in a group, requires a margin over the next group, and limits a suggestion group to twelve photos. Face and object cutoffs are heuristic proposal thresholds, not calibrated identity probabilities. Ambiguous candidates remain separate; confirmation is still required. The candidate policy is exercised by `ReviewGroupsTest`.
+
+On the x86_64 emulator, all ten `NamedSubjectsTest` cases passed. The batch case checks that an edited selection leaves the store untouched. It then confirms two valid regions, reopens the encrypted store, and verifies that their alias resolves to exactly those photos while an unchecked lookalike stays out.
+
 Saving a new **Person** or **Object** opens the review and starts comparing accessible photos locally. An exact name or alias in **Named** search exposes **Review possible matches** for a saved identity. The review presents every confirmed photo first, followed by up to 3, 5 or 10 possible matches. The default is 5. Each photo appears once in the ranking and shows its highest-scoring region. **Confirm match** saves the same named identity against that region. **Skip** hides a candidate for the current review, and the next ranked photo can take its place.
+
+To add several photos to an existing name, select the matching cards in **Possible matches** and tap **Confirm N selected**. Each card starts unchecked. Confirmation uses the same revision checks and transaction as group naming. If anything changed, review the refreshed matches before trying again. The saved-name stale-batch regression passed on the emulator and verified that existing links were preserved.
 
 The face pipeline uses YuNet's five landmarks to align a face to the OpenCV SFace template. A marked reference must isolate one detected face. An unmarked portrait must contain exactly one detected face. The object pipeline uses normalized DINOv2 features for object regions and whole-photo comparisons. It blends 85% DINOv2 similarity with 15% hue-histogram similarity when both crops contain enough visible color. Faces are scored independently of the object pipeline. The highest similarity against the confirmed references gives the per-photo score. [OpenCV face alignment and SFace](https://docs.opencv.org/4.12.0/d0/dd4/tutorial_dnn_face.html) · [DINOv2 paper](https://arxiv.org/abs/2304.07193)
 

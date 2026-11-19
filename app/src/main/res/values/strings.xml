@@ -1,5 +1,27 @@
 <resources>
+    <string name="suggestions_name_selected">Name %1$d selected</string>
+    <string name="identity_confirm_selected">Confirm %1$d selected</string>
+    <string name="identity_select_candidate">Select %1$s</string>
     <string name="model_notices_title">Model licenses and notices</string>
+    <string name="search_capabilities_title">Search capabilities</string>
+    <string name="search_capabilities_profile">Installed build profile: %1$s</string>
+    <string name="search_capability_available">Available</string>
+    <string name="search_capability_not_included">Not included</string>
+    <string name="search_capability_visual">Visual prompt search</string>
+    <string name="search_capability_text">Remembered text search</string>
+    <string name="search_capability_regions">Photo and region suggestions</string>
+    <string name="search_capability_people">Confirmed person search</string>
+    <string name="search_capability_objects">Confirmed exact-object search</string>
+    <string name="search_capability_clothing">Clothing detail search</string>
+    <string name="model_pack_local_only">Specialist models stay on this phone. Installing a pack does not send photos.</string>
+    <string name="model_pack_install">Install specialist model pack</string>
+    <string name="model_pack_installing">Verifying and installing…</string>
+    <string name="model_pack_removing">Removing local specialist models…</string>
+    <string name="model_pack_install_success">Pack verified. Available capabilities are updated.</string>
+    <string name="model_pack_install_failed">Pack could not be verified or installed.</string>
+    <string name="model_pack_remove">Remove specialist model files</string>
+    <string name="model_pack_removed">Installed specialist models were removed.</string>
+    <string name="model_pack_remove_failed">Specialist model files could not be removed.</string>
     <string name="model_notices_back">All notices</string>
     <string name="library_storage_unavailable">%1$d storage volumes unavailable · Retry</string>
     <string name="library_folder_unavailable">%1$s · Unavailable</string>

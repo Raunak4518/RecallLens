@@ -77,11 +77,11 @@ class MainActivity : ComponentActivity() {
                     onRemoveSubject = library::removeSubject,
                     onRemoveDatedAlias = library::removeDatedAlias,
                     suggestions = SuggestionActions(library::openReview, library::closeReview, library::scanMoreSuggestions,
-                        library::chooseSuggestion, library::skipSuggestion),
+                        library::chooseSuggestion, library::chooseSuggestionGroup, library::skipSuggestion),
                     identity = IdentityActions(library::openMatchingQuery, library::closeIdentity, library::scanIdentity,
                         library::limitIdentity, library::confirmIdentity, library::skipIdentity,
                         library::rejectIdentity, library::undoIdentityRejection, library::editIdentityGroup,
-                        library::undoIdentityGroupEdit),
+                        library::undoIdentityGroupEdit, library::confirmIdentities),
                     loadImage = library::loadImage,
                 )
             }

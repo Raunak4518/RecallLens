@@ -66,6 +66,31 @@ The encrypted visual payload stores a 40-byte signature plus an eight-byte envel
 Fixtures cover resized images, visually distinct images with the same synthetic embedding, expansion behavior, older payloads and inference-free backfill and reuse. Runtime ranking, false-family, indexing-cost and storage measurements are still open.
 
 
+## Typed document-field continuation
+
+A07 now derives typed OCR observations for holder names, identifiers, dates, institutions, class level, exam year, scores and amounts. Inline label/value pairs are retained with their OCR line index. Separate label and value lines are linked only when their bounding boxes are adjacent. Exact document prompts can include one or more explicit field clues; contradictions are excluded and missing OCR values remain possible results. The existing marksheet path remains separate.
+
+Regression sources cover inline values, vertically adjacent and same-row label/value boxes, distant or unlocated values, parent-name exclusion, exact PAN-number and holder-name filtering, multi-field conjunction and missing-field uncertainty. The ARM64 app source compiled with the selected Tiny OCR and query-expansion flags. The feasibility Android test sources compiled; no instrumentation tests were run. Retrieval quality, OCR layout errors, document-type false alerts and field accuracy remain runtime evaluation gates.
+
+
+## Encoder strategy boundary
+
+The app composition now exposes `ImageTextEncoder` to indexing and query orchestration. `ClipModel` is the current composition-root implementation; a candidate can implement the same query and image-processing contract without changing `LibraryViewModel` or `LocalPhotoIndexer`. Model-specific compatible evidence upgrades remain optional. ARM64 debug packaging and feasibility-test source compilation succeeded after this change. No alternative encoder is integrated or claimed to be better; A06 comparison and promotion remain open.
+
+
+## Android package inventory
+
+The current ARM64 debug APK measured 364,312,534 bytes (347.5 MiB) before profile selection was added. Its compressed ZIP entries included 147.1 MiB of CLIP assets, 60.2 MiB of identity assets, 16.9 MiB of garment assets, 6.0 MiB of Tiny OCR assets, 3.7 MiB of detection assets and 66.7 MiB of native libraries. `photolibraryModelProfile=full` remains the default and stages all `.local-models` assets. `photolibraryModelProfile=core` stages CLIP only. Search capabilities are derived from model availability and listed in the Sources menu; unsupported identity, region-review and clothing actions are hidden for the core profile. A local specialist-pack catalog and ZIP task bind optional files to SHA-256 values in the APK. The import flow streams to app-private storage, rejects paths or files outside the catalog, checks each file and manifest, opens each model runtime before activation, then switches the active version pointer atomically. A failed validation or activation leaves the prior active pointer unchanged. Successful replacement removes superseded pack directories; stale pack data can be removed from Search capabilities. This is failure-safe activation, not rollback after a successful replacement. Removal uses the same model-file lock as loading. Interrupted staging cleanup runs on an application IO coroutine. Seven Android instrumentation cases now cover valid activation, archive and installed-file digest tampering, traversal, preservation of the previous pointer when candidate validation fails, removal, and interrupted-install cleanup. They have not been built or exercised. Profile size, installed-size and startup-cost comparisons remain open.
+
+Garment evidence dependencies now derive face-detector, person-detector and upper-clothing parser revisions from hashes in the APK-pinned catalog. Model loading verifies mapped artifact bytes against those hashes, and installed-pack verification entries are scoped by canonical file path. This prevents a changed model from inheriting stale garment evidence or another pack directory's cached verification. The garment evaluation manifest and its regression now use the selected parser hash instead of a source constant. These changes are authored but unbuilt and unrun.
+
+Build the reduced asset profile with `-PphotolibraryModelProfile=core`. It retains broad visual search, OCR and the offline baseline while specialist model assets are omitted. Use the default `full` profile for the complete bundled-model candidate. Run `:app:packageSpecialistModelPack` to create `app/build/outputs/model-packs/specialist-model-pack.zip` from the pinned local model files. The profile is a packaging boundary, not an evaluated recommendation to remove any model from the finished product. The installer regression cases are authored but unrun; the Compose flow, capability refresh, package/install size, and startup cost still need verification. Successful pack replacement has no post-activation rollback.
+
+## Indexing orchestration continuation
+
+Text and visual cache restoration now lives in `PhotoIndexRestoration`, which owns both restore jobs and their completion barriers. It retains source-snapshot publication guards and delegates search refresh callbacks to the ViewModel. This reduces indexing lifecycle details in `LibraryViewModel` without reorganizing unrelated query and identity responsibilities. The extraction has not been built or exercised; query execution, gallery reload and identity review remain separate decomposition work.
+
+
 ## OCR retrieval index continuation
 
 O04 now builds an incremental in-memory inverted index over local and approved legacy OCR. A query verifies an exact phrase against individual OCR lines only for candidates matching its rarest indexed token. Multiple terms can still retrieve a partial candidate across lines. Scope changes filter existing postings. Revised or removed text detaches its previous postings. Filenames remain a separate route, with whole-token matching for numeric queries to protect leading zeros and similar identifiers.

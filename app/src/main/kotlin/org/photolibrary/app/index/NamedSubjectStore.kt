@@ -26,6 +26,7 @@ import org.photolibrary.app.subjects.subjectWords
 import org.photolibrary.app.subjects.validSubjectLabel
 
 internal data class NamedContentProof(val revision: String, val digest: String)
+internal data class NamedReferenceDraft(val uri: Uri, val revision: String, val region: PhotoRegion?, val contentDigest: String?)
 
 internal class NamedSubjectStore(private val index: EncryptedPhotoIndex) {
     fun setSelf(subjectId: Long?): Boolean = index.withDatabase { db -> db.transaction {
@@ -84,7 +85,11 @@ internal class NamedSubjectStore(private val index: EncryptedPhotoIndex) {
     }
 
     fun confirm(uri: Uri, revision: String, choice: SubjectSelection, region: PhotoRegion?, contentDigest: String? = null): Confirmation =
-        index.withDatabase { db ->
+        confirmAll(choice, listOf(NamedReferenceDraft(uri, revision, region, contentDigest)))
+
+    fun confirmAll(choice: SubjectSelection, references: List<NamedReferenceDraft>): Confirmation {
+        require(references.isNotEmpty() && references.map { it.uri }.distinct().size == references.size)
+        return index.withDatabase { db ->
             db.transaction {
                 if (choice is SubjectSelection.New && choice.currentCollege && choice.kind != SubjectKind.ORGANIZATION) {
                     return@transaction Confirmation.INVALID_COLLEGE
@@ -102,20 +107,23 @@ internal class NamedSubjectStore(private val index: EncryptedPhotoIndex) {
                     is SubjectSelection.New -> insertSubject(db, choice)
                         ?: return@transaction Confirmation.DUPLICATE_NAME
                 }
-                db.execSQL("DELETE FROM named_references WHERE uri = ? AND revision <> ?", arrayOf(uri.toString(), revision))
-                db.execSQL(
-                    "INSERT OR REPLACE INTO named_references VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    arrayOf<Any?>(id, uri.toString(), revision, region?.left, region?.top, region?.right, region?.bottom),
-                )
-                removeRejection(db, id, IdentityRejection(uri, revision, region.identityKey()))
-                if (contentDigest != null) db.execSQL("INSERT OR REPLACE INTO named_photo_content VALUES (?, ?, ?)",
-                    arrayOf(uri.toString(), revision, contentDigest))
+                for ((uri, revision, region, contentDigest) in references) {
+                    db.execSQL("DELETE FROM named_references WHERE uri = ? AND revision <> ?", arrayOf(uri.toString(), revision))
+                    db.execSQL(
+                        "INSERT OR REPLACE INTO named_references VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        arrayOf<Any?>(id, uri.toString(), revision, region?.left, region?.top, region?.right, region?.bottom),
+                    )
+                    removeRejection(db, id, IdentityRejection(uri, revision, region.identityKey()))
+                    if (contentDigest != null) db.execSQL("INSERT OR REPLACE INTO named_photo_content VALUES (?, ?, ?)",
+                        arrayOf(uri.toString(), revision, contentDigest))
+                }
                 pruneContentProofs(db)
                 if (datedAlias != null) insertDatedAlias(db, DatedSubjectAlias(id, datedAlias))
                 if (choice.currentCollege) setCurrentCollege(db, id)
                 Confirmation.SAVED
             }
         }
+    }
 
     fun identityRejections(subjectId: Long): Set<IdentityRejection> = index.withDatabase { db -> readRejections(db, subjectId) }
 

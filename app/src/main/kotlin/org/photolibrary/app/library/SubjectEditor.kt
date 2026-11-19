@@ -79,7 +79,11 @@ internal fun SubjectEditor(
         } else null
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.subject_editor_title)) },
+        title = {
+            val count = state.review.selectedGroup.size
+            Text(if (count > 1) stringResource(R.string.suggestions_name_selected, count)
+                else stringResource(R.string.subject_editor_title))
+        },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 PhotoImage(photo.uri, 640, state.imageRevision, loadImage, ContentScale.Fit,

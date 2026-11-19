@@ -36,14 +36,20 @@ internal fun LibrarySourcesMenu(
     onResumeIndexing: () -> Unit,
     onNameSuggestions: () -> Unit,
     onAnalyzeClothing: () -> Unit,
+    capabilities: SearchCapabilities,
+    modelPackStored: Boolean,
+    onInstallModelPack: suspend (Uri) -> Unit,
+    onRemoveModelPack: suspend () -> Unit,
+    onCapabilitiesChanged: () -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     var foldersOpen by remember { mutableStateOf(false) }
     var noticesOpen by remember { mutableStateOf(false) }
     var runtimeNoticesOpen by remember { mutableStateOf(false) }
+    var capabilitiesOpen by remember { mutableStateOf(false) }
     var selfOpen by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { menuOpen = true }, enabled = !state.loading) {
+        TextButton(onClick = { menuOpen = true }, enabled = !state.loading && !state.clothingAnalyzing) {
             Text(stringResource(R.string.library_sources))
         }
         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -62,11 +68,13 @@ internal fun LibrarySourcesMenu(
                 DropdownMenuItem(text = { Text(stringResource(R.string.library_manage_folders)) }, onClick = { menuOpen = false; foldersOpen = true })
             }
             DropdownMenuItem(text = { Text(stringResource(R.string.library_permissions)) }, onClick = { menuOpen = false; onPermissionSettings() })
-            DropdownMenuItem(text = { Text(stringResource(R.string.self_identity_title)) }, onClick = { menuOpen = false; selfOpen = true })
-            if (state.indexedPhotos.isNotEmpty()) {
+            if (capabilities.personIdentitySearch) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.self_identity_title)) }, onClick = { menuOpen = false; selfOpen = true })
+            }
+            if (state.indexedPhotos.isNotEmpty() && capabilities.anonymousRegionReview) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.suggestions_title)) }, onClick = { menuOpen = false; onNameSuggestions() })
             }
-            if (state.named.references.any { it.region != null &&
+            if (capabilities.clothingSearch && state.named.references.any { it.region != null &&
                     state.named.kindOf(it.subjectId) == org.photolibrary.app.subjects.SubjectKind.PERSON }) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.clothing_analyze)) }, enabled = !state.clothingAnalyzing,
                     onClick = { menuOpen = false; onAnalyzeClothing() })
@@ -78,12 +86,22 @@ internal fun LibrarySourcesMenu(
                     if (state.indexingPaused) onResumeIndexing() else onPauseIndexing()
                 })
             }
+            DropdownMenuItem(text = { Text(stringResource(R.string.search_capabilities_title)) }, onClick = { menuOpen = false; capabilitiesOpen = true })
             DropdownMenuItem(text = { Text(stringResource(R.string.model_notices_title)) }, onClick = { menuOpen = false; noticesOpen = true })
             DropdownMenuItem(text = { Text(stringResource(R.string.runtime_notices_title)) }, onClick = { menuOpen = false; runtimeNoticesOpen = true })
         }
     }
     if (noticesOpen) ModelNoticesDialog { noticesOpen = false }
     if (runtimeNoticesOpen) RuntimeNoticesDialog { runtimeNoticesOpen = false }
+    if (capabilitiesOpen) {
+        SearchCapabilitiesDialog(
+            capabilities,
+            modelPackStored,
+            onInstallModelPack,
+            onRemoveModelPack,
+            onCapabilitiesChanged,
+        ) { capabilitiesOpen = false }
+    }
     if (selfOpen) SelfIdentityDialog(state.named, state.loading, onDismiss = { selfOpen = false }, onSave = {
         selfOpen = false
         onSelectSelf(it)

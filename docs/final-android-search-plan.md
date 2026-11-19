@@ -259,3 +259,7 @@ For coordination with the earlier checklist, the retrieval, OCR and evaluation w
 
 **First build decision.** Deliver A01–A05 before integrating replacement weights. In parallel after A04, run A06–A08 as independent experiments on the same inputs. If the correct photo never reaches the shortlist, improve the evidence or retrieval route. If it reaches the shortlist and loses to a lookalike, improve the verifier and binding. If ranking is already right and search feels slow, optimize the observed device bottleneck. That sequence makes each model change answer a specific user-visible failure.
 
+## 13. Post-plan model-quality track
+
+Laptop-GPU model evaluation is a quality experiment, not a phone-speed benchmark. Keep model/system relevance measurements separate from Android latency, memory, storage, battery and thermal measurements. The 200-query design, data-rights checks, GPU runner, training gates and Android follow-up are specified in [Model quality and Android performance evaluation](gpu-quality-evaluation-plan.md) as MQ01–MQ08.
+

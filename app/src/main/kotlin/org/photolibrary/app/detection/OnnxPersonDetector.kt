@@ -10,8 +10,7 @@ import org.photolibrary.app.subjects.PhotoRegion
 import org.photolibrary.app.subjects.SubjectKind
 import org.photolibrary.app.index.ModelRevision
 
-internal class OnnxPersonDetector(modelBytes: ByteBuffer) : AutoCloseable {
-    val model get() = MODEL
+internal class OnnxPersonDetector(modelBytes: ByteBuffer, val model: ModelRevision) : AutoCloseable {
     private val environment = OrtEnvironment.getEnvironment()
     private val session = OrtSession.SessionOptions().use { options ->
         options.setIntraOpNumThreads(2)
@@ -46,9 +45,4 @@ internal class OnnxPersonDetector(modelBytes: ByteBuffer) : AutoCloseable {
     }
 
     override fun close() = session.close()
-
-    companion object {
-        val MODEL = ModelRevision("yolox-nano-person",
-            "c789161ed43c8269fcd4e67c67eeeb4e80c622da2eb296a20bc6007bd18a0b7d:416-pad114:score0.35:nms0.45", 416)
-    }
 }

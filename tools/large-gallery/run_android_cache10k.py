@@ -40,6 +40,13 @@ def run(adb_path, manifest_path, receipt_path, output):
     if len(queries) < 3 or len(set(queries)) != len(queries):
         raise ValueError("Need distinct frozen queries")
 
+    return run_fixture(adb_path, files, {
+        "manifestSha256": manifest_sha, "vectorsSha256": receipt["vectors"]["sha256"],
+        "idsSha256": receipt["ids"]["sha256"], "queries": queries,
+    }, len(ids), output)
+
+
+def run_fixture(adb_path, files, payload, photo_count, output, timeout=480):
     def adb(*parts, timeout=60, check=True):
         result = subprocess.run([str(adb_path), "-s", SERIAL, *map(str, parts)], capture_output=True, timeout=timeout, check=check)
         return result.stdout.decode("utf-8", errors="replace")
@@ -50,8 +57,6 @@ def run(adb_path, manifest_path, receipt_path, output):
     token = f"cache10k-{uuid.uuid4().hex}"
     remote = f"/data/local/tmp/{token}"
     private = f"files/{token}"
-    payload = {"manifestSha256": manifest_sha, "vectorsSha256": receipt["vectors"]["sha256"],
-               "idsSha256": receipt["ids"]["sha256"], "queries": queries}
     try:
         adb("shell", "mkdir", remote)
         for file in files:
@@ -62,20 +67,22 @@ def run(adb_path, manifest_path, receipt_path, output):
             adb("push", config, f"{remote}/input.json")
         adb("shell", "run-as", APP, "cp", "-R", remote, private)
         result = adb("shell", "am", "instrument", "-w", "-r", "-e", "class", CLASS, "-e", "cache10k", "true",
-                     "-e", "cache10kFixture", token, APP + ".test/androidx.test.runner.AndroidJUnitRunner", timeout=480)
+                     "-e", "cache10kFixture", token, APP + ".test/androidx.test.runner.AndroidJUnitRunner", timeout=timeout)
         (output / "instrumentation.txt").write_text(result, encoding="utf-8")
         if "OK (1 test)" not in result or "INSTRUMENTATION_CODE: -1" not in result or re.search(r"INSTRUMENTATION_STATUS_CODE: -[24]\b", result):
             raise RuntimeError("Android cache benchmark did not pass")
         data = json.loads(adb("exec-out", "run-as", APP, "cat", private + "/result.json"))
-        if not data["complete"] or data["photos"] != 10_000 or data["manifestSha256"] != manifest_sha or data["vectorsSha256"] != payload["vectorsSha256"]:
+        if not data["complete"] or data["photos"] != photo_count or any(
+                data[key] != payload[key] for key in ("manifestSha256", "vectorsSha256")):
             raise ValueError("Android receipt does not match the input")
-        if [row["query"] for row in data["queries"]] != queries:
+        if [row["query"] for row in data["queries"]] != payload["queries"]:
             raise ValueError("Android report query mismatch")
         data["serial"] = SERIAL
         data["warmEncodeMsMedian"] = statistics.median(row["encodeMs"] for row in data["queries"][1:])
         data["warmRankMsMedian"] = statistics.median(row["rankMs"] for row in data["queries"][1:])
         (output / "results.json").write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({key: value for key, value in data.items() if key != "queries"}), flush=True)
+        return data
     finally:
         adb("shell", "run-as", APP, "rm", "-rf", private, check=False)
         adb("shell", "rm", "-rf", remote, check=False)

@@ -8,16 +8,19 @@ import android.content.res.AssetManager
 import android.graphics.Bitmap
 import java.io.IOException
 import java.nio.FloatBuffer
-import java.nio.channels.FileChannel
 import org.photolibrary.app.index.PhotoProcessingException
+import org.photolibrary.app.models.ModelFileStore
 import org.photolibrary.app.subjects.SubjectKind
 
-internal class OnnxRegionModels(private val assets: AssetManager) {
-    val available by lazy { assets.list(FOLDER).orEmpty().toSet().containsAll(listOf(OBJECTS, FACES, LABELS)) }
+internal class OnnxRegionModels(private val modelFiles: ModelFileStore) {
+    constructor(assets: AssetManager) : this(ModelFileStore.bundled(assets))
+
+    val available get() = modelFiles.list(FOLDER).containsAll(listOf(OBJECTS, FACES, LABELS))
+    val faceRevision get() = GarmentModelRevisions.faceDetector(modelFiles.sha256("$FOLDER/$FACES"))
     private val environment by lazy { OrtEnvironment.getEnvironment() }
 
     fun open(): RegionDetector = inference {
-        val labels = assets.open("$FOLDER/$LABELS").bufferedReader().use { it.readLines() }
+        val labels = modelFiles.open("$FOLDER/$LABELS").bufferedReader().use { it.readLines() }
         require(labels.size == 80)
         val objects = session(OBJECTS)
         try {
@@ -66,12 +69,7 @@ internal class OnnxRegionModels(private val assets: AssetManager) {
     private fun session(name: String): OrtSession = OrtSession.SessionOptions().use { options ->
         options.setIntraOpNumThreads(2)
         options.setInterOpNumThreads(1)
-        assets.openFd("$FOLDER/$name").use { asset ->
-            asset.createInputStream().use {
-                val model = it.channel.map(FileChannel.MapMode.READ_ONLY, asset.startOffset, asset.length)
-                environment.createSession(model, options)
-            }
-        }
+        environment.createSession(modelFiles.mapVerified("$FOLDER/$name"), options)
     }
 
     private companion object {

@@ -33,6 +33,7 @@ internal data class SuggestionReview(
     val scanned: Set<Uri> = emptySet(),
     val candidates: List<NameSuggestion> = emptyList(),
     val selected: NameSuggestion? = null,
+    val selectedGroup: List<NameSuggestion> = emptyList(),
 )
 
 internal class PhotoDetectionScan(

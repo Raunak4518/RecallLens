@@ -19,42 +19,43 @@ import org.photolibrary.app.index.PhotoProcessingException
 import org.photolibrary.app.index.PhotoProcessor
 import org.photolibrary.app.index.tracePhotoStage
 
-internal class ClipModel(private val assets: AssetManager) {
+internal class ClipModel(private val assets: AssetManager) : ImageTextEncoder {
     private val detailViews = org.photolibrary.app.BuildConfig.SCENE_DETAIL_VIEWS
     private val cropPolicy = if (detailViews) "center-and-edges-v1" else "center-bilinear-v1"
     private val previousRevision = ModelRevision("clip-vit-b32", "6b7c523703ae26e39be4b03774966f8571c7f523:android-$cropPolicy", 896)
-    val revision = previousRevision.copy(version = "${previousRevision.version}:copy-signature-v1")
-    val copySignatureUpgrade = PhotoEvidenceUpgrade<PhotoEmbedding>(previousRevision, ::measureCopySignature)
+    override val revision = previousRevision.copy(version = "${previousRevision.version}:copy-signature-v1")
+    override val evidenceUpgrade = PhotoEvidenceUpgrade<PhotoEmbedding>(previousRevision, ::measureCopySignature)
 
     private fun measureCopySignature(image: Bitmap, embedding: PhotoEmbedding): PhotoEmbedding =
         tracePhotoStage("photos.index.copySignature") { embedding.withCopySignature(PhotoCopySignature.measure(image)) }
-    val available by lazy { assets.list(FOLDER).orEmpty().toSet().containsAll(listOf(VISION, TEXT, TOKENIZER, PREPROCESSOR)) }
+    private val textModelFile = org.photolibrary.app.BuildConfig.CLIP_TEXT_MODEL_FILE
+    override val available by lazy { assets.list(FOLDER).orEmpty().toSet().containsAll(listOf(VISION, textModelFile, TOKENIZER, PREPROCESSOR)) }
     private val environment by lazy { OrtEnvironment.getEnvironment() }
     private val inputs by lazy { ImageInputs(readSpec(PREPROCESSOR)) }
     private val tokenizer by lazy { ClipTokenizer(readSpec(TOKENIZER)) }
     private val textLock = Any()
     private var textSession: OrtSession? = null
 
-    fun encodeQuery(query: String): PhotoEmbedding = synchronized(textLock) {
+    override fun encodeQuery(query: String): PhotoEmbedding = synchronized(textLock) {
         inference {
             val tokens = tracePhotoStage("photos.query.tokenize") { tokenizer.encode(query) }
-            val session = textSession ?: session(TEXT).also { textSession = it }
+            val session = textSession ?: session(textModelFile).also { textSession = it }
             OnnxTensor.createTensor(environment, LongBuffer.wrap(tokens), longArrayOf(1, tokens.size.toLong())).use {
                 tracePhotoStage("photos.query.textEncoder") { embed(session, "input_ids", it) }
             }
         }
     }
 
-    fun prepareTextSearch() = synchronized(textLock) {
+    override fun prepareTextSearch() = synchronized(textLock) {
         if (textSession == null) encodeQuery("photo")
     }
 
-    fun releaseTextSession() = synchronized(textLock) {
+    override fun releaseTextSession() = synchronized(textLock) {
         textSession?.close()
         textSession = null
     }
 
-    fun imageProcessor(): PhotoProcessor<PhotoEmbedding> = object : PhotoProcessor<PhotoEmbedding> {
+    override fun imageProcessor(): PhotoProcessor<PhotoEmbedding> = object : PhotoProcessor<PhotoEmbedding> {
         override val model = revision
         private var vision: OrtSession? = null
 
@@ -141,7 +142,6 @@ internal class ClipModel(private val assets: AssetManager) {
     private companion object {
         const val FOLDER = "clip"
         const val VISION = "vision_model_quantized.onnx"
-        const val TEXT = "text_model_quantized.onnx"
         const val TOKENIZER = "tokenizer.json"
         const val PREPROCESSOR = "preprocessor_config.json"
     }

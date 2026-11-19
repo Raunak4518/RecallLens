@@ -19,6 +19,8 @@ CLASSES = (
     "ModelNoticesTest", "RuntimeNoticesTest", "PartialContentQueryTest", "PartialContentWorkflowTest", "PhotoCacheRestorationTest",
     "SelfIdentityTest", "SelfIdentityWorkflowTest", "ComplexNearbyPlanTest", "PhotoContentSearchTest", "ComplexNearbyWorkflowTest", "PhotoLocationPublicationTest",
     "CaptureYearQueryTest", "CaptureEventsTest", "MarksheetEvidenceTest", "DocumentSearchWorkflowTest",
+    "DocumentFieldEvidenceTest", "DocumentFieldQueryTest", "ModelPackInstallerTest",
+    "ModelRevisionCatalogTest",
 )
 
 

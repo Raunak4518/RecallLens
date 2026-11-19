@@ -1,3 +1,4 @@
+import java.security.MessageDigest
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -7,6 +8,109 @@ plugins {
 
 val mlKitLatinVersion = "16.0.1"
 val paddleOcrBenchmark = providers.gradleProperty("photolibraryPaddleBenchmark").map(String::toBoolean).orElse(false)
+val modelProfile = providers.gradleProperty("photolibraryModelProfile").orElse("full").get()
+require(modelProfile in setOf("full", "core")) { "Supported photolibraryModelProfile values are full and core" }
+val clipTextPrecision = providers.gradleProperty("photolibraryClipTextPrecision").orElse("quantized").get()
+val clipTextModelFile = mapOf(
+    "quantized" to "text_model_quantized.onnx",
+    "q4" to "text_model_q4.onnx",
+).getOrElse(clipTextPrecision) { error("Supported photolibraryClipTextPrecision values are quantized and q4") }
+val selectedModelAssets = layout.buildDirectory.dir("generated/selected-model-assets")
+val visualRerankerSource = providers.gradleProperty("photolibraryVisualReranker").orNull?.let(rootProject::file)
+val visualRerankerSha = "7faf3b04a355ce7491e5a3f61aedaff2988d5cac2c299199b440891d82839c97"
+val rerankerTextGraphSha = "e4ccd15d806b8af841a036884b42034535d58e04c52df00f56e73f72d3c166d5"
+fun File.contentSha256(): String = inputStream().use { stream ->
+    val digest = MessageDigest.getInstance("SHA-256")
+    val chunk = ByteArray(65_536)
+    while (true) {
+        val count = stream.read(chunk)
+        if (count < 0) break
+        digest.update(chunk, 0, count)
+    }
+    digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+}
+val stageSelectedModelAssets = tasks.register<Sync>("stageSelectedModelAssets") {
+    inputs.property("modelProfile", modelProfile)
+    inputs.property("clipTextModelFile", clipTextModelFile)
+    if (clipTextPrecision == "q4") {
+        val q4Graph = rootProject.file(".local-models/clip/$clipTextModelFile")
+        require(q4Graph.isFile) { "Stage the Q4 graph with tools/stage_app_clip.py --q4-source before building" }
+    }
+    if (visualRerankerSource != null) {
+        require(clipTextPrecision == "q4") { "The experimental visual reranker requires Q4" }
+        require(!providers.gradleProperty("photolibrarySceneViews").orElse("false").get().toBooleanStrict())
+        require(!providers.gradleProperty("photolibraryCompactIndex").orElse("false").get().toBooleanStrict())
+        val graph = rootProject.file(".local-models/clip/$clipTextModelFile")
+        require(visualRerankerSource.isFile && visualRerankerSource.contentSha256() == visualRerankerSha)
+        require(graph.contentSha256() == rerankerTextGraphSha)
+        from(visualRerankerSource) {
+            into("visual-reranker")
+            rename { "weights.plr" }
+        }
+    }
+    from(rootProject.file(".local-models")) {
+        if (modelProfile == "core") include("clip/**")
+        exclude("visual-reranker/**")
+        exclude {
+            it.path in setOf("clip/text_model_quantized.onnx", "clip/text_model_q4.onnx") &&
+                it.path != "clip/$clipTextModelFile"
+        }
+    }
+    into(selectedModelAssets)
+}
+val modelCatalogFile = layout.buildDirectory.file("generated/model-pack-catalog/catalog.json")
+val modelCatalogAssets = layout.buildDirectory.dir("generated/model-pack-catalog-assets")
+val specialistModelFiles = fileTree(rootProject.file(".local-models")) {
+    include("detection/**", "identity/**", "garment/**")
+}
+val generateModelPackCatalog = tasks.register("generateModelPackCatalog") {
+    inputs.files(specialistModelFiles)
+    outputs.file(modelCatalogFile)
+    doLast {
+        val root = rootProject.file(".local-models")
+        val records = specialistModelFiles.files.sortedBy { it.relativeTo(root).invariantSeparatorsPath }.map { file ->
+            val path = file.relativeTo(root).invariantSeparatorsPath
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { stream ->
+                val buffer = ByteArray(65_536)
+                while (true) {
+                    val count = stream.read(buffer)
+                    if (count < 0) break
+                    digest.update(buffer, 0, count)
+                }
+            }
+            val hash = digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            Triple(path, hash, file.length())
+        }
+        val identity = records.joinToString("|") { "${it.first}:${it.second}:${it.third}" }
+        val version = MessageDigest.getInstance("SHA-256").digest(identity.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+        val entries = records.joinToString(",") { (path, hash, bytes) ->
+            "{\"path\":\"$path\",\"sha256\":\"$hash\",\"bytes\":$bytes}"
+        }
+        val manifest = "{\"schema\":1,\"id\":\"specialist-models\",\"version\":\"$version\",\"files\":[$entries]}"
+        val output = modelCatalogFile.get().asFile
+        output.parentFile.mkdirs()
+        output.writeText(manifest)
+    }
+}
+val stageModelPackCatalog = tasks.register<Sync>("stageModelPackCatalog") {
+    dependsOn(generateModelPackCatalog)
+    from(modelCatalogFile) {
+        into("model-packs")
+        rename { "catalog.json" }
+    }
+    into(modelCatalogAssets)
+}
+tasks.register<Zip>("packageSpecialistModelPack") {
+    dependsOn(generateModelPackCatalog)
+    archiveFileName.set("specialist-model-pack.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("outputs/model-packs"))
+    from(rootProject.file(".local-models")) {
+        include("detection/**", "identity/**", "garment/**")
+    }
+    from(modelCatalogFile) { rename { "manifest.json" } }
+}
 val ocrEngine = providers.gradleProperty("photolibraryOcr").orElse("mlkit").get()
 require(ocrEngine in setOf("mlkit", "tiny")) { "Supported photolibraryOcr values are mlkit and tiny" }
 val visualQueryExpansions = providers.gradleProperty("photolibraryQueryExpansions").orElse("").get()
@@ -51,6 +155,9 @@ android {
         versionCode = 2
         versionName = "0.2.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "MODEL_PROFILE", "\"$modelProfile\"")
+        buildConfigField("String", "CLIP_TEXT_MODEL_FILE", "\"$clipTextModelFile\"")
+        buildConfigField("String", "VISUAL_RERANKER_TEXT_SHA", "\"${if (visualRerankerSource == null) "" else rerankerTextGraphSha}\"")
         if (targetAbi != null) ndk.abiFilters += targetAbi
         buildConfigField("boolean", "DETAIL_OCR", detailOcr.toString())
         buildConfigField("boolean", "FAIR_INDEX", fairIndex.toString())
@@ -77,7 +184,9 @@ android {
         sourceSets.getByName("androidTest").kotlin.srcDir(rootProject.file("tools/paddle-mobile"))
         sourceSets.getByName("androidTest").assets.directories.add("build/ocr-android-sdk/assets")
     }
-    sourceSets.getByName("main").assets.directories.add(rootProject.file(".local-models").path)
+    sourceSets.getByName("main").assets.directories.add(selectedModelAssets.get().asFile.path)
+    sourceSets.getByName("main").assets.directories.add(modelCatalogAssets.get().asFile.path)
+    tasks.named("preBuild").configure { dependsOn(stageSelectedModelAssets, stageModelPackCatalog) }
 
     androidResources {
         noCompress += "onnx"

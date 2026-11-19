@@ -175,7 +175,18 @@ internal class EncryptedPhotoIndex(private val directory: File, alias: String) {
             result
         }
 
-        override fun save(uri: Uri, photo: IndexedPhoto<Output>) = access {
+        override fun save(uri: Uri, photo: IndexedPhoto<Output>) = access { write(uri, photo) }
+
+        override fun saveBatch(records: List<Pair<Uri, IndexedPhoto<Output>>>) {
+            if (records.isEmpty()) return
+            access {
+                db.transaction {
+                    for ((uri, photo) in records) write(uri, photo)
+                }
+            }
+        }
+
+        private fun write(uri: Uri, photo: IndexedPhoto<Output>) {
             db.execSQL(
                 "INSERT OR REPLACE INTO $tableName (uri, source_revision, pixel_revision, model, model_version, model_edge, output) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 arrayOf<Any?>(uri.toString(), photo.sourceRevision, photo.pixelRevision, photo.model.name,

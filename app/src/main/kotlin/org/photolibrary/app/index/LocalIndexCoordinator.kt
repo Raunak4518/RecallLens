@@ -153,7 +153,7 @@ internal class LocalIndexCoordinator(
                 currentCoroutineContext().ensureActive()
                 val current = control.read()
                 if (current.paused) return IndexingBatch(current, ready.size, emptySet())
-                index.refresh(inputs, { _, _ -> }, selected, unavailable) { uri, output ->
+                index.refresh(inputs, { _, _ -> }, selected, unavailable, writeBatchSize = 8) { uri, output ->
                     if (output != null) ready.add(uri)
                 }
             }
