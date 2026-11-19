@@ -8,11 +8,21 @@ The app searches an Android photo library from one natural-language prompt, grou
 
 1. The user grants gallery access and lets local indexing build the encrypted search catalog.
 2. In **Sources → Name suggestions**, local face and common-object detectors find candidate regions. Candidates are partitioned by detected kind and label, then compared with the corresponding face or object descriptor.
-3. A cluster is presented only as **Possible same subject**. The current proposal policy uses complete-link similarity against the group, a margin over the next group, a maximum of twelve photos, and task-specific score cutoffs. A missing feature, ambiguous score or duplicate photo remains separate.
+3. A cluster appears as **Possible same subject**. For faces, the closest group member must reach a similarity of 0.55 and every member must clear 0.50. For objects, every member must reach 0.90. Both use a 0.04 gap over the next eligible group and propose at most twelve distinct photos per group. The face scores use aligned crops, so the surrounding scene does not determine a match.
 4. The user unchecks lookalikes and names only the selected photos as one entity. The app checks every source revision and saves the confirmed region links together in one encrypted transaction.
 5. Named search resolves the name to those confirmed links. Unreviewed suggestions do not become Named results.
 
 These cutoffs are candidate-generation rules, not calibrated identity probabilities. Similarity groups can contain the wrong subject; the review and explicit confirmation are required. This is a human-reviewed local grouping feature, not a claim of perfect automatic face or instance clustering.
+
+Opening Name suggestions scans permitted photos independently of OCR and scene indexing. The encrypted index keeps each completed photo's regions, descriptors, and skipped regions. Closing review stops its active scan. Reopening restores valid records and resumes missing work. The app checks source and model revisions before reusing records.
+
+The phone build uses the Q4 CLIP text encoder for visual prompts. This uses the same image encoder and existing cached image vectors. Q4 improved known-target Hit@5 from 30.5% to 74.5% on the existing 200-prompt cached-vector test. That measure covers visual retrieval. [Model evaluation results](model-quality-evaluation-results.md)
+
+## Phone update
+
+Photo detail opens a larger viewer with pinch and double-tap zoom. Share and Open with hand the original URI to the Android chooser with read access for the recipient selected by the user. The library shows a separate text-index count while OCR coverage is incomplete.
+
+The phone build uses `-PphotolibraryClipTextPrecision=q4 -PphotolibraryFairIndex=true`. The scheduler alternates visual and OCR work so OCR can start before visual indexing finishes. Each indexing batch can decode the next photo during inference and keep at most one additional bitmap. The visual encoder chooses one to six inference threads when a batch opens its model session, depending on the available processors, memory, power mode and thermal status. Release qualification still needs sustained temperature, memory and paired thumbnail/search timing on physical phones.
 
 ## Two-icon feedback flow
 

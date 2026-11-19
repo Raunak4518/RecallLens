@@ -22,11 +22,13 @@ import org.junit.runner.RunWith
 import org.photolibrary.app.detection.OnnxRegionModels
 import org.photolibrary.app.index.EncryptedPhotoIndex
 import org.photolibrary.app.index.NamedSubjectStore
+import org.photolibrary.app.identity.IdentityModels
 import org.photolibrary.app.library.NameSuggestion
 import org.photolibrary.app.library.PhotoDetectionScan
 import org.photolibrary.app.library.PhotoLibrary
 import org.photolibrary.app.library.PhotoSubjects
 import org.photolibrary.app.library.SelectedPhoto
+import org.photolibrary.app.library.UnavailableSources
 import org.photolibrary.app.subjects.Confirmation
 import org.photolibrary.app.subjects.NamedSearch
 import org.photolibrary.app.subjects.SubjectKind
@@ -75,13 +77,14 @@ class RegionDetectionTest {
         val library = PhotoLibrary(context)
         val alias = "detection-fixture-${UUID.randomUUID()}"
         val directory = context.noBackupFilesDir.resolve(alias)
-        val subjects = PhotoSubjects(library, NamedSubjectStore(EncryptedPhotoIndex(directory, alias)))
+        val storage = EncryptedPhotoIndex(directory, alias)
+        val subjects = PhotoSubjects(library, NamedSubjectStore(storage))
         val created = mutableListOf<Uri>()
         try {
             val first = insertDog(created)
             val second = insertDog(created)
             var photos = library.list().photos.filter { it.uri in created }
-            val candidates = suggestions(library, photos).filter { it.detection.label == "dog" }
+            val candidates = suggestions(library, photos, storage).filter { it.detection.label == "dog" }
             assertEquals(created.toSet(), candidates.map { it.photo.uri }.toSet())
             val firstDog = candidates.first { it.photo.uri == first }
             val secondDog = candidates.first { it.photo.uri == second }
@@ -111,9 +114,11 @@ class RegionDetectionTest {
         }
     }
 
-    private suspend fun suggestions(library: PhotoLibrary, photos: List<SelectedPhoto>): List<NameSuggestion> {
+    private suspend fun suggestions(library: PhotoLibrary, photos: List<SelectedPhoto>, storage: EncryptedPhotoIndex): List<NameSuggestion> {
         val detections = mutableListOf<NameSuggestion>()
-        PhotoDetectionScan(library, models).scan(photos) { _, found -> detections += found }
+        PhotoDetectionScan(library, models, IdentityModels(context.assets), storage).scan(photos, UnavailableSources.NONE) {
+            detections += it.values.flatten()
+        }
         return detections
     }
 

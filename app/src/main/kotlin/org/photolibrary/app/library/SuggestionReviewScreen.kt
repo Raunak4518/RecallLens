@@ -61,12 +61,12 @@ internal fun SuggestionReviewScreen(
     }
     Text(stringResource(R.string.suggestions_hint), style = MaterialTheme.typography.bodyMedium)
     if (review.scanning || state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-    if (review.scanning) Text(stringResource(R.string.suggestions_progress, review.scanned.size, state.indexedPhotos.size))
+    if (review.scanning) Text(stringResource(R.string.suggestions_progress, review.scanned.size, state.photos.size))
     if (review.failed) Text(stringResource(R.string.suggestions_failed), color = MaterialTheme.colorScheme.error)
     if (!state.loading && !review.scanning && !review.failed && candidates.isEmpty()) {
-        Text(stringResource(if (state.indexedPhotos.isEmpty()) R.string.suggestions_no_photos else R.string.suggestions_empty))
+        Text(stringResource(if (state.photos.isEmpty()) R.string.suggestions_no_photos else R.string.suggestions_empty))
     }
-    if (!state.loading && !review.scanning && review.scanned.size < state.indexedPhotos.size) {
+    if (!state.loading && !review.scanning && (review.failed || review.scanned.size < state.photos.size)) {
         TextButton(onClick = actions.scanMore) {
             Text(stringResource(if (review.failed) R.string.suggestions_retry else R.string.suggestions_more))
         }

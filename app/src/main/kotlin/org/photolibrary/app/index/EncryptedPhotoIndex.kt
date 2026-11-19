@@ -11,6 +11,8 @@ import net.zetetic.database.sqlcipher.SQLiteDatabase
 import org.photolibrary.app.identity.IdentityCacheCodec
 import org.photolibrary.app.identity.IdentityCacheEntry
 import org.photolibrary.app.library.UnavailableSources
+import org.photolibrary.app.library.SuggestionRecordCodec
+import org.photolibrary.app.library.SuggestionRegion
 import org.json.JSONException
 import org.photolibrary.app.semantic.PhotoEmbedding
 import org.photolibrary.app.subjects.SubjectKind
@@ -26,9 +28,11 @@ internal class EncryptedPhotoIndex(private val directory: File, alias: String) {
 
     fun openIdentity(kind: SubjectKind): PhotoIndexSession<IdentityCacheEntry> = openTable(IDENTITY.getValue(kind))
 
+    fun openSuggestions(): PhotoIndexSession<List<SuggestionRegion>> = openTable(SUGGESTIONS)
+
     fun pruneIdentity(accessible: Map<Uri, String?>, unavailable: UnavailableSources = UnavailableSources.NONE) = withDatabase { db ->
         db.transaction {
-            for (table in IDENTITY.values) {
+            for (table in IDENTITY.values + SUGGESTIONS) {
                 val stale = db.rawQuery("SELECT uri, source_revision, pixel_revision FROM ${table.name}", emptyArray<String>()).use { rows ->
                     buildList {
                         while (rows.moveToNext()) {
@@ -101,13 +105,15 @@ internal class EncryptedPhotoIndex(private val directory: File, alias: String) {
             if (version < 12) db.execSQL("DROP TABLE IF EXISTS cloud_configuration")
             if (version < 13) NamedSubjectStore.createIdentityRejections(db)
             if (version < 14) NamedSubjectStore.createDatedAliases(db)
+            if (version < 15) createTable(db, SUGGESTIONS.name, "BLOB", ifMissing = true)
             db.version = SCHEMA_VERSION
         }
     }
 
-    private fun createTable(db: SQLiteDatabase, name: String, type: String) {
+    private fun createTable(db: SQLiteDatabase, name: String, type: String, ifMissing: Boolean = false) {
+        val guard = if (ifMissing) "IF NOT EXISTS " else ""
         db.execSQL(
-            """CREATE TABLE $name (
+            """CREATE TABLE $guard$name (
                 uri TEXT PRIMARY KEY, source_revision TEXT, pixel_revision TEXT,
                 model TEXT NOT NULL, model_version TEXT NOT NULL, model_edge INTEGER NOT NULL,
                 output $type NOT NULL
@@ -124,6 +130,18 @@ internal class EncryptedPhotoIndex(private val directory: File, alias: String) {
         private val lock: Any,
     ) : PhotoIndexSession<Output> {
         private val tableName = table.name
+
+        override fun readOne(uri: Uri): IndexedPhoto<Output>? = access {
+            db.rawQuery(
+                "SELECT source_revision, pixel_revision, model, model_version, model_edge, output FROM $tableName WHERE uri = ?",
+                arrayOf(uri.toString()),
+            ).use { row ->
+                if (row.moveToFirst()) IndexedPhoto(
+                    row.getString(0), row.getString(1),
+                    ModelRevision(row.getString(2), row.getString(3), row.getInt(4)), table.decode(row, 5),
+                ) else null
+            }
+        }
 
         override fun current(accessible: Map<Uri, String?>, model: ModelRevision) =
             current(accessible, model, UnavailableSources.NONE)
@@ -226,7 +244,10 @@ internal class EncryptedPhotoIndex(private val directory: File, alias: String) {
     }
 
     private companion object {
-        const val SCHEMA_VERSION = 14
+        const val SCHEMA_VERSION = 15
+        val SUGGESTIONS = Table("suggested_regions", SuggestionRecordCodec::encode) { row, column ->
+            SuggestionRecordCodec.decode(row.getBlob(column))
+        }
         val TEXT = Table("photo_text", PhotoTextCodec::encode) { row, column -> PhotoTextCodec.decode(row.getString(column)) }
         val EMBEDDINGS = Table("image_embeddings", PhotoEmbedding::encodeForStorage) { row, column -> PhotoEmbedding.decode(row.getBlob(column)) }
         val IDENTITY = mapOf(

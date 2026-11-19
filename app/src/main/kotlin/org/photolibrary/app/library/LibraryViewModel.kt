@@ -238,6 +238,8 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun refresh() = reload()
 
+    fun resumeLibrary() = reload(reuseIfUnchanged = true)
+
     fun recheckPhotos() = reload(recheckIndex = true)
 
     fun startObserving() {
@@ -396,7 +398,7 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
 
     fun openReview() {
         mutableState.update { it.copy(review = it.review.copy(open = true)) }
-        if (state.value.review.scanned.isEmpty()) scanMoreSuggestions()
+        scanMoreSuggestions()
     }
 
     fun closeReview() {
@@ -425,28 +427,45 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
     }
 
     fun skipSuggestion(suggestion: NameSuggestion) {
-        mutableState.update { it.copy(review = it.review.copy(candidates = it.review.candidates - suggestion)) }
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) { context.photoDetection.dismiss(suggestion) }
+                mutableState.update { it.copy(review = it.review.copy(candidates = it.review.candidates - suggestion)) }
+            } catch (_: PhotoIndexUnavailable) {
+                mutableState.update { it.copy(notice = R.string.library_index_unavailable) }
+            } catch (_: PhotoProcessingException) {
+                mutableState.update { it.copy(review = it.review.copy(failed = true)) }
+            }
+        }
     }
 
     fun scanMoreSuggestions() {
         val current = state.value
         if (!current.review.open || !current.suggestionsAvailable || current.loading || current.review.scanning) return
-        val photos = current.indexedPhotos.asSequence().filterNot { it.uri in current.review.scanned }.take(24).toList()
+        val photos = current.photos
         if (photos.isEmpty()) return
-        mutableState.update { it.copy(review = it.review.copy(scanning = true, failed = false)) }
+        val snapshot = PhotoSourceSnapshot.capture(current)
+        val unavailable = UnavailableSources.from(current.folders, current.unavailableVolumes)
+        mutableState.update { it.copy(review = SuggestionReview(open = true, scanning = true)) }
         suggestionJob = viewModelScope.launch {
             try {
                 withContext(Dispatchers.IO) {
-                    context.photoDetection.scan(photos) { uri, candidates ->
+                    context.photoDetection.scan(photos, unavailable) { batch ->
                         withContext(Dispatchers.Main.immediate) {
                             mutableState.update {
-                                it.copy(review = it.review.copy(scanned = it.review.scanned + uri, candidates = it.review.candidates + candidates))
+                                if (!it.review.open || !snapshot.matches(it)) it
+                                else it.copy(review = it.review.copy(
+                                    scanned = it.review.scanned + batch.keys,
+                                    candidates = it.review.candidates + batch.values.flatten(),
+                                ))
                             }
                         }
                     }
                 }
                 mutableState.update { it.copy(review = it.review.copy(scanning = false)) }
             } catch (_: PhotoProcessingException) {
+                mutableState.update { it.copy(review = it.review.copy(scanning = false, failed = true)) }
+            } catch (_: PhotoIndexUnavailable) {
                 mutableState.update { it.copy(review = it.review.copy(scanning = false, failed = true)) }
             }
         }
@@ -717,9 +736,20 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
         library.loadImage(uri, maxEdge)
     }
 
-    private fun reload(scheduleIndexing: Boolean = true, recheckIndex: Boolean = false, change: (() -> Int?)? = null) {
+    private fun reload(scheduleIndexing: Boolean = true, recheckIndex: Boolean = false,
+        reuseIfUnchanged: Boolean = false, change: (() -> Int?)? = null,
+    ) {
         viewModelScope.launch {
             operations.withLock {
+                val previous = state.value
+                val resumeSources = if (reuseIfUnchanged && !previous.loading &&
+                    GalleryAccess.current(context) == previous.galleryAccess
+                ) withContext(Dispatchers.IO) { library.list() } else null
+                if (resumeSources != null && resumeSources.scope == previous.galleryAccess &&
+                    resumeSources.photos == previous.photos && resumeSources.folders == previous.folders &&
+                    resumeSources.unavailableVolumes == previous.unavailableVolumes &&
+                    previous.photos.none { it.sourceRevision == null }
+                ) return@withLock
                 photoIndexRestoration.cancel()
                 inputSearchJob?.cancel()
                 queries.cancel()
@@ -754,9 +784,31 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                     clearSearchResults(updated)
                 }
                 identityMaintenanceJob?.cancelAndJoin()
-                val (sources, named, notice) = withContext(Dispatchers.IO) {
-                    val notice = change?.invoke()
-                    val sources = library.list()
+                val (sources, notice) = withContext(Dispatchers.IO) {
+                    val sourceNotice = change?.invoke()
+                    (resumeSources ?: library.list()) to sourceNotice
+                }
+                val photos = sources.photos
+                sourceObserver?.folders(sources.folders.map { it.uri })
+                val unavailable = sources.unavailableSources
+                mutableState.update { current ->
+                    val updated = current.copy(
+                        galleryAccess = sources.scope,
+                        folders = sources.folders,
+                        unavailableVolumes = sources.unavailableVolumes,
+                        photos = photos,
+                        opened = current.opened?.takeIf { uri -> photos.any { it.uri == uri } },
+                        loading = false,
+                        restoringIndex = photos.isNotEmpty(),
+                        visualIndexing = current.visualAvailable && photos.isNotEmpty(),
+                        imageRevision = current.imageRevision + 1,
+                        notice = notice,
+                    )
+                    clearSearchResults(withIndexedPhotos(updated))
+                }
+                val restoration = photoIndexRestoration.start(photos, unavailable)
+                refreshSearchResults()
+                val (named, namedNotice) = withContext(Dispatchers.IO) {
                     try {
                         val references = context.cloudText.references()
                         val revisions = sources.photos.filter { it.uri in references }.mapNotNull { photo ->
@@ -770,34 +822,15 @@ internal class LibraryViewModel(application: Application) : AndroidViewModel(app
                             })
                         }
                     } catch (_: PhotoIndexUnavailable) {
-                        cloudText.clear()
+                        withContext(Dispatchers.Main.immediate) { cloudText.clear() }
                     }
                     try {
-                        Triple(sources, context.photoSubjects.refresh(sources.photos, sources.unavailableSources), notice)
+                        context.photoSubjects.refresh(photos, unavailable) to null
                     } catch (_: PhotoIndexUnavailable) {
-                        Triple(sources, NamedLibrary(), notice ?: R.string.subject_index_unavailable)
+                        NamedLibrary() to R.string.subject_index_unavailable
                     }
                 }
-                val photos = sources.photos
-                sourceObserver?.folders(sources.folders.map { it.uri })
-                val unavailable = sources.unavailableSources
-                mutableState.update { current ->
-                    val updated = current.copy(
-                        galleryAccess = sources.scope,
-                        folders = sources.folders,
-                        unavailableVolumes = sources.unavailableVolumes,
-                        photos = photos,
-                        named = named,
-                        opened = current.opened?.takeIf { uri -> photos.any { it.uri == uri } },
-                        loading = false,
-                        restoringIndex = photos.isNotEmpty(),
-                        visualIndexing = current.visualAvailable && photos.isNotEmpty(),
-                        imageRevision = current.imageRevision + 1,
-                        notice = notice,
-                    )
-                    clearSearchResults(withIndexedPhotos(updated))
-                }
-                val restoration = photoIndexRestoration.start(photos, unavailable)
+                mutableState.update { withIndexedPhotos(it.copy(named = named, notice = namedNotice ?: it.notice)) }
                 refreshSearchResults()
                 identityMaintenanceJob = viewModelScope.launch {
                     restoration.text.await()

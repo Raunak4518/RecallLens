@@ -16,6 +16,7 @@ internal class OnnxRegionModels(private val modelFiles: ModelFileStore) {
     constructor(assets: AssetManager) : this(ModelFileStore.bundled(assets))
 
     val available get() = modelFiles.list(FOLDER).containsAll(listOf(OBJECTS, FACES, LABELS))
+    val revision get() = listOf(FACES, OBJECTS, LABELS).joinToString(":") { modelFiles.sha256("$FOLDER/$it") }
     val faceRevision get() = GarmentModelRevisions.faceDetector(modelFiles.sha256("$FOLDER/$FACES"))
     private val environment by lazy { OrtEnvironment.getEnvironment() }
 

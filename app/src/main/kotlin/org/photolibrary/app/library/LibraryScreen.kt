@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -172,15 +171,7 @@ internal fun LibraryScreen(
                     Text(opened.title(), style = MaterialTheme.typography.titleLarge)
                     if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
                     state.notice?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error) }
-                    PhotoImage(
-                        uri = opened.uri,
-                        maxEdge = 1600,
-                        revision = state.imageRevision,
-                        loadImage = loadImage,
-                        contentScale = ContentScale.Fit,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).aspectRatio(4f / 3f),
-                        description = opened.title(),
-                    )
+                    PhotoDetailPreview(opened, opened.title(), state.imageRevision, loadImage)
                     val names = state.named.subjectsIn(opened.uri)
                     Text(stringResource(R.string.subject_detail_heading), style = MaterialTheme.typography.titleMedium)
                     if (names.isNotEmpty()) {
@@ -232,6 +223,10 @@ private fun PhotoGrid(
     if (state.photos.isNotEmpty()) {
         Text(stringResource(R.string.library_indexed_count, state.indexedPhotos.size, state.photos.size),
             modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }, style = MaterialTheme.typography.bodySmall)
+        if (state.textIndexed < state.photos.size) {
+            Text(stringResource(R.string.library_text_indexed_count, state.textIndexed, state.photos.size),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 
     if (state.photos.isEmpty()) {

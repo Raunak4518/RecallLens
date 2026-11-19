@@ -1,6 +1,8 @@
 package org.photolibrary.app
 
 import android.app.Application
+import android.app.ActivityManager
+import android.os.PowerManager
 import org.photolibrary.app.detection.OnnxRegionModels
 import org.photolibrary.app.identity.IdentityModels
 import org.photolibrary.app.library.IdentityMatcher
@@ -65,7 +67,7 @@ class PhotoLibraryApplication : Application() {
     internal val clothingSearch by lazy { org.photolibrary.app.library.ClothingSearch(garmentAnalysis, garmentEvidence, photoLocations,
         org.photolibrary.app.library.PhotoEvidenceValidation(library)) }
     private val identityModels by lazy { IdentityModels(modelFiles) }
-    internal val photoDetection by lazy { PhotoDetectionScan(library, regionModels, identityModels) }
+    internal val photoDetection by lazy { PhotoDetectionScan(library, regionModels, identityModels, storage) }
     internal val identityMatcher by lazy { IdentityMatcher(library, regionModels, identityModels, storage) }
     internal val storage by lazy { EncryptedPhotoIndex(noBackupFilesDir.resolve("photo-text-index"), "photo-library.ocr-wrap.v1") }
     private val textFactory by lazy { scriptAwareFactory(configuredTextFactory(this)) }
@@ -80,7 +82,19 @@ class PhotoLibraryApplication : Application() {
             org.photolibrary.app.semantic.ResidualVisualRanker.decode(it.readBytes(), graph)
         }
     }
-    internal val clip: ImageTextEncoder by lazy { ClipModel(assets) }
+    internal val clip: ImageTextEncoder by lazy { ClipModel(assets, ::indexingThreads) }
+
+    private fun indexingThreads(): Int {
+        val power = getSystemService(PowerManager::class.java)
+        val activity = getSystemService(ActivityManager::class.java)
+        val memory = ActivityManager.MemoryInfo().also(activity::getMemoryInfo)
+        val thermal = power.currentThermalStatus
+        if (memory.lowMemory || thermal >= PowerManager.THERMAL_STATUS_SEVERE) return 1
+        if (activity.isLowRamDevice || power.isPowerSaveMode || thermal >= PowerManager.THERMAL_STATUS_MODERATE ||
+            memory.availMem < 1024L * 1024 * 1024
+        ) return 2
+        return (Runtime.getRuntime().availableProcessors() - 2).coerceIn(1, 6)
+    }
     internal val modelCapabilities: SearchCapabilities
         get() =
         SearchCapabilities(

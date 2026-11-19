@@ -13,6 +13,7 @@ internal data class IndexedPhoto<Output>(
 )
 
 internal interface PhotoIndexSession<Output> : AutoCloseable {
+    fun readOne(uri: Uri): IndexedPhoto<Output>? = error("Direct read is unavailable for this store")
     fun reconcile(accessible: Set<Uri>): Map<Uri, IndexedPhoto<Output>>
     fun reconcile(accessible: Set<Uri>, read: Set<Uri>): Map<Uri, IndexedPhoto<Output>> =
         reconcile(accessible).filterKeys { it in read }

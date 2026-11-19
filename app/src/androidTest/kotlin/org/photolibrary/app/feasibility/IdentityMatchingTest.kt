@@ -28,6 +28,10 @@ import org.photolibrary.app.library.IdentityCacheUsage
 import org.photolibrary.app.library.IdentityRanking
 import org.photolibrary.app.library.IdentityReview
 import org.photolibrary.app.library.PhotoLibrary
+import org.photolibrary.app.library.PhotoDetectionScan
+import org.photolibrary.app.library.NameSuggestion
+import org.photolibrary.app.library.UnavailableSources
+import org.photolibrary.app.library.groupReviewRegions
 import org.photolibrary.app.library.PhotoSubjects
 import org.photolibrary.app.library.SelectedPhoto
 import org.photolibrary.app.subjects.Confirmation
@@ -47,6 +51,40 @@ class IdentityMatchingTest {
     @Test
     fun alignedFaceRanksAnotherPhotoAheadOfAnotherAstronaut() = runBlocking<Unit> {
         checkRanking(SubjectKind.PERSON, "Face fixture", listOf("face-reference.png", "face-same.jpg", "face-lookalike.jpg"))
+    }
+
+    @Test
+    fun faceSuggestionsGroupAcrossCapturesAndRestoreWithDismissal() = runBlocking<Unit> {
+        val permission = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_IMAGES else Manifest.permission.READ_EXTERNAL_STORAGE
+        instrumentation.uiAutomation.grantRuntimePermission(context.packageName, permission)
+        val library = PhotoLibrary(context)
+        val alias = "suggestion-fixture-${UUID.randomUUID()}"
+        val directory = context.noBackupFilesDir.resolve(alias)
+        val inserted = mutableListOf<Uri>()
+        try {
+            listOf("face-reference.png", "face-same.jpg", "face-lookalike.jpg").forEach { insertFixture(it, inserted) }
+            val (anchor, same, lookalike) = inserted
+            val photos = library.list().photos.filter { it.uri in inserted }
+            fun scanner() = PhotoDetectionScan(library, OnnxRegionModels(context.assets), IdentityModels(context.assets),
+                EncryptedPhotoIndex(directory, alias))
+            suspend fun faces(scan: PhotoDetectionScan): List<NameSuggestion> = buildList {
+                scan.scan(photos, UnavailableSources.NONE) { batch ->
+                    addAll(batch.values.flatten().filter { it.detection.kind == SubjectKind.PERSON })
+                }
+            }
+            val firstScan = faces(scanner())
+            assertTrue(firstScan.any { it.photo.uri == lookalike })
+            val groups = groupReviewRegions(firstScan)
+            assertTrue(groups.map { group -> group.map { it.photo.uri }.toSet() }.contains(setOf(anchor, same)))
+            val reopened = faces(scanner())
+            assertEquals(firstScan.map { it.photo.uri to it.detection }, reopened.map { it.photo.uri to it.detection })
+            scanner().dismiss(reopened.first { it.photo.uri == same })
+            assertTrue(faces(scanner()).none { it.photo.uri == same })
+        } finally {
+            inserted.forEach { resolver.delete(it, null, null) }
+            KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.deleteEntry(alias)
+            directory.deleteRecursively()
+        }
     }
 
     @Test
@@ -86,7 +124,7 @@ class IdentityMatchingTest {
             Log.i("IdentityMatchingTest", "$kind " + ranked.joinToString { "${files[inserted.indexOf(it.photo.uri)]}=${it.score}" })
             assertEquals(same, ranked.first().photo.uri)
             assertTrue(ranked.any { it.photo.uri == lookalike })
-            assertEquals((0 until photos.size).toList(), checked)
+            assertEquals(listOf(0, photos.size - 1), checked)
             assertEquals(NamedSearch.Matches(setOf(anchor)), searchNamed(name, subjects.refresh(photos), true))
             verifyCache(kind, library, storage, directory, before, photos, complete)
             assertEquals(NamedSearch.Matches(setOf(anchor)), searchNamed(name, subjects.refresh(photos), true))
@@ -122,6 +160,9 @@ class IdentityMatchingTest {
             db.execSQL("DROP TABLE person_garments")
             db.execSQL("DROP TABLE named_photo_content")
             db.execSQL("DROP TABLE self_identity")
+            db.execSQL("DROP TABLE identity_rejections")
+            db.execSQL("DROP TABLE named_dated_aliases")
+            db.execSQL("DROP TABLE suggested_regions")
             db.version = 4
         }
         val count = photos.size - 1

@@ -5,7 +5,11 @@ import android.net.Uri
 import java.nio.ByteBuffer
 import java.security.MessageDigest
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.photolibrary.app.library.UnavailableSources
@@ -124,10 +128,7 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
                     val end = minOf(start + writeBatchSize, pending.size)
                     val candidates = pending.subList(start, end)
                     val batch = if (candidates.any { it.sourceRevision == null }) candidates.take(1) else candidates
-                    val prepared = batch.map { photo ->
-                        currentCoroutineContext().ensureActive()
-                        photo to preparePhoto(photo, records[photo.uri], revision, processor, index)
-                    }
+                    val prepared = prepareBatch(batch, records, revision, processor, index)
                     val results = prepared.map { (photo, record) ->
                         currentCoroutineContext().ensureActive()
                         val current = record != null && if (photo.sourceRevision != null) {
@@ -161,15 +162,47 @@ internal class LocalPhotoIndexer<Output : Any> private constructor(
         }
     }
 
+    private suspend fun prepareBatch(
+        photos: List<IndexPhoto>,
+        previous: Map<Uri, IndexedPhoto<Output>>,
+        model: ModelRevision,
+        processor: Lazy<PhotoProcessor<Output>>,
+        index: PhotoIndexSession<Output>,
+    ): List<Pair<IndexPhoto, IndexedPhoto<Output>?>> = coroutineScope {
+        if (photos.size == 1) {
+            val photo = photos.single()
+            val image = loadImage(photo.uri, model.maxImageEdge)
+            return@coroutineScope listOf(photo to preparePhoto(photo, previous[photo.uri], model, processor, index, image))
+        }
+        val decoded = Channel<Bitmap?>(onUndeliveredElement = { it?.recycle() })
+        val decoder = launch(Dispatchers.IO) {
+            for (photo in photos) {
+                ensureActive()
+                decoded.send(loadImage(photo.uri, model.maxImageEdge))
+            }
+        }
+        try {
+            photos.map { photo ->
+                ensureActive()
+                val image = decoded.receive()
+                photo to preparePhoto(photo, previous[photo.uri], model, processor, index, image)
+            }
+        } finally {
+            decoded.cancel()
+            decoder.cancel()
+        }
+    }
+
     private suspend fun preparePhoto(
         photo: IndexPhoto,
         previous: IndexedPhoto<Output>?,
         model: ModelRevision,
         processor: Lazy<PhotoProcessor<Output>>,
         index: PhotoIndexSession<Output>,
+        image: Bitmap?,
     ): IndexedPhoto<Output>? {
         val (uri, sourceRevision) = photo
-        val image = loadImage(uri, model.maxImageEdge) ?: run {
+        if (image == null) {
             index.remove(uri)
             return null
         }

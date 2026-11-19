@@ -19,7 +19,10 @@ import org.photolibrary.app.index.PhotoProcessingException
 import org.photolibrary.app.index.PhotoProcessor
 import org.photolibrary.app.index.tracePhotoStage
 
-internal class ClipModel(private val assets: AssetManager) : ImageTextEncoder {
+internal class ClipModel(
+    private val assets: AssetManager,
+    private val indexingThreads: () -> Int = { 2 },
+) : ImageTextEncoder {
     private val detailViews = org.photolibrary.app.BuildConfig.SCENE_DETAIL_VIEWS
     private val cropPolicy = if (detailViews) "center-and-edges-v1" else "center-bilinear-v1"
     private val previousRevision = ModelRevision("clip-vit-b32", "6b7c523703ae26e39be4b03774966f8571c7f523:android-$cropPolicy", 896)
@@ -79,7 +82,7 @@ internal class ClipModel(private val assets: AssetManager) : ImageTextEncoder {
     }
 
     private fun session(name: String): OrtSession = OrtSession.SessionOptions().use { options ->
-        options.setIntraOpNumThreads(2)
+        options.setIntraOpNumThreads(if (name == VISION) indexingThreads() else 2)
         options.setInterOpNumThreads(1)
         assets.openFd("$FOLDER/$name").use { asset ->
             asset.createInputStream().use { stream ->

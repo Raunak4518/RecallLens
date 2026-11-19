@@ -2,6 +2,7 @@ package org.photolibrary.app.library
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import org.photolibrary.app.identity.IdentityVector
 import org.photolibrary.app.subjects.SubjectKind
 
 internal suspend fun groupReviewRegions(candidates: List<NameSuggestion>): List<List<NameSuggestion>> {
@@ -16,9 +17,9 @@ internal suspend fun groupReviewRegions(candidates: List<NameSuggestion>): List<
         var bestScore = -1f
         var runnerUp = -1f
         if (descriptor != null) {
-            for (group in bucket.takeLast(128)) {
+            for (group in bucket) {
                 if (group.size >= 12 || group.any { it.photo.uri == candidate.photo.uri }) continue
-                val score = group.minOf { it.descriptor!!.similarity(descriptor) }
+                val score = groupScore(group, descriptor, detection.kind)
                 if (score > bestScore) {
                     runnerUp = bestScore
                     bestScore = score
@@ -26,7 +27,7 @@ internal suspend fun groupReviewRegions(candidates: List<NameSuggestion>): List<
                 } else if (score > runnerUp) runnerUp = score
             }
         }
-        val threshold = if (detection.kind == SubjectKind.PERSON) .62f else .90f
+        val threshold = if (detection.kind == SubjectKind.PERSON) .55f else .90f
         if (best != null && bestScore >= threshold && bestScore - runnerUp >= .04f) {
             best.add(candidate)
         } else {
@@ -36,4 +37,21 @@ internal suspend fun groupReviewRegions(candidates: List<NameSuggestion>): List<
         }
     }
     return groups.sortedByDescending { it.size }
+}
+
+private fun groupScore(
+    group: List<NameSuggestion>,
+    descriptor: IdentityVector,
+    kind: SubjectKind,
+): Float {
+    var strongest = -1f
+    var weakest = 1f
+    for (member in group) {
+        val similarity = checkNotNull(member.descriptor).similarity(descriptor)
+        if (kind == SubjectKind.PERSON && similarity < .50f) return -1f
+        if (kind == SubjectKind.OBJECT && similarity < .90f) return -1f
+        strongest = maxOf(strongest, similarity)
+        weakest = minOf(weakest, similarity)
+    }
+    return if (kind == SubjectKind.PERSON) strongest else weakest
 }

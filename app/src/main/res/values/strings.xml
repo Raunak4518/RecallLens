@@ -46,6 +46,12 @@
     <string name="results_related">Related by appearance</string>
     <string name="index_coverage">Search coverage · text %1$d · contents %2$d · %3$d photos</string>
     <string name="library_indexed_count">Processed %1$d of %2$d photos</string>
+    <string name="photo_zoom">Zoom</string>
+    <string name="photo_reset_zoom">Reset zoom</string>
+    <string name="photo_share">Share</string>
+    <string name="photo_open_with">Open with</string>
+    <string name="photo_action_unavailable">This photo could not be opened in another app.</string>
+    <string name="library_text_indexed_count">Text index: %1$d of %2$d photos</string>
     <string name="library_prompt_label">Search photos</string>
     <string name="library_prompt_example">My car, Diwali, or words in a photo</string>
     <string name="library_clear_search">Clear</string>

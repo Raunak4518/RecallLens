@@ -95,7 +95,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        library.refresh()
+        library.resumeLibrary()
     }
 
     override fun onStop() {
