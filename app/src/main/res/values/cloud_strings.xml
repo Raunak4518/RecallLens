@@ -1,0 +1,20 @@
+<resources>
+    <string name="cloud_connection">Cloud connection</string>
+    <string name="cloud_setup_hint">Connect once using the service details provided by its operator. These settings are stored in your encrypted index.</string>
+    <string name="cloud_service_url">Service HTTPS address</string>
+    <string name="cloud_access_key">Service access key</string>
+    <string name="cloud_worker_key">Pinned worker public key (base64)</string>
+    <string name="cloud_development">Local emulator development server</string>
+    <string name="cloud_save">Save connection</string>
+    <string name="cloud_forget">Forget connection</string>
+    <string name="cloud_cancel">Cancel processing</string>
+    <string name="cloud_result">Text from approved cloud copy</string>
+    <string name="cloud_empty">No text was found.</string>
+    <string name="cloud_not_connected">Set up a cloud connection to send this copy.</string>
+    <string name="cloud_approve_send">Approve and send this exact copy</string>
+    <string name="cloud_processing">Processing the approved copy…</string>
+    <string name="cloud_complete">Processing completed.</string>
+    <string name="cloud_failed">Cloud processing could not finish. Check your connection and service settings, then review the copy again.</string>
+    <string name="cloud_settings_failed">The cloud settings could not be saved or opened. Check the service address, access key and worker key.</string>
+    <string name="cloud_cleanup_pending">The service could not confirm deletion. Its expiry policy still applies.</string>
+</resources>

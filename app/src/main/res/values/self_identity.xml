@@ -1,0 +1,10 @@
+<resources>
+    <string name="self_identity_title">Who is me?</string>
+    <string name="self_identity_action">This is me</string>
+    <string name="self_identity_explanation">Choose a saved person for searches like “my photos” and “me”. This uses only their confirmed photos and does not verify anyone’s identity.</string>
+    <string name="self_identity_empty">Name and confirm a person in a photo first. They will appear here.</string>
+    <string name="self_identity_current">Used for “me” and “myself”</string>
+    <string name="self_identity_clear">Clear my selection</string>
+    <string name="self_identity_cancel">Cancel</string>
+    <string name="self_identity_error">That saved person is no longer available. Refresh and choose again.</string>
+</resources>

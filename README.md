@@ -1,0 +1,162 @@
+# Private photo library
+
+Android phone photo search with an encrypted local index. See the [current phone build and reproduction steps](docs/android-search-build-handoff.md).
+
+The [baseline accelerated implementation record](docs/accelerated-implementation.md) describes the integrated query, access-validation and search-guidance changes, their corrected test failures and current verification limits. The app already supports local OCR/scene search, confirmed names, identity suggestions, nearby queries, person/color estimates and approved encrypted cloud OCR. Read [execution status](docs/execution-status.md) for the latest evidence; physical-device cost measurements and public-distribution qualification remain open. Local release signing has been verified.
+
+The latest visual-first build passed 27 Android checks with zero skips, 25 host tests, build, and lint. The previous focused run passed 58 Android checks with one opt-in skip and covered explicit self selection, complex nearby filtering, encrypted migrations, query races, and Named behavior. The earlier clean full baseline passed 80 Android checks with three opt-in skips on its recorded snapshot. The signed ARM64 APK and AAB belong to an earlier snapshot and passed eleven static package checks. The receipts identify the tested build and device.
+
+Current execution evidence is recorded in [execution status](docs/execution-status.md). Durable indexing uses WorkManager, encrypted checkpoints, and explicit pause and resume. When the visual model is available, it makes its first pass before OCR starts filling the text index. The current processed count counts each photo once, as soon as a usable result is available. Cloud processing uses an authenticated local service and Android transport with encrypted result persistence. Full and redacted workflows passed against the development service. Configure a service endpoint, caller credential and pinned worker key once in cloud-copy settings before approving uploads. Credentials and derived results are stored in SQLCipher.
+
+Use **Analyze clothing in confirmed photos** after confirming a marked person region. A query such as **Ronak wearing black** uses cached region evidence. Exact shirt subtype and spatial relationships require further model evidence. Color classification has observed errors in the real-photo smoke cohort, so inspect returned photos.
+
+Use **Search photos** for a scene, recognized words, a filename, or saved names. The main gallery shows only photos with a current search index entry and reports **Processed X of Y photos**. Exact saved names show confirmed matches. A more descriptive request can show clearly labeled partial suggestions within a recognized saved-name scope. Select **Sources → Who is me?** to associate personal queries with a saved person. A query ending **around [saved place]** can use a 30 km radius around confirmed GPS anchors. Spatial conditions such as **behind** may remain unverified. [Self and nearby acceptance](docs/self-and-complex-location-plan.md) · [Partial-search and coverage acceptance](docs/partial-content-search.md).
+
+Try **Find similar photos** from an indexed photo to find nearby cached visual vectors. The prompt also accepts capture-year filters such as **my car in 2023** and calendar queries such as **Diwali pics 2025**. The [semantic search demo record](docs/semantic-search-demo.md) covers the workflows and model comparisons.
+
+For a photo of a school result, try **I want my 10th marksheet**. Search uses cached OCR for the document title, grade, and a labeled candidate name. Choose **Sources → Who is me?** to use a saved name. Photos whose owner or class could not be established are labeled as possible matches. Use **from 2021** for an exam year and **in 2021** for a photo capture year. The [search processing evaluation](docs/search-processing-evaluation.md) records the broader detail-search design, OCR results, and completed 10,000-photo visual benchmark.
+
+While the screen is open, source notifications refresh the library after photos are added, renamed, trashed, restored or deleted. The app also refreshes when resumed. [Live-source verification](docs/source-observation.md)
+
+Renaming or moving a photo within its MediaStore volume rechecks its decoded pixels and reuses valid OCR, scene and identity embeddings without reopening those models. Other derived records still follow their own revision rules. [OCR/scene verification](docs/metadata-cache-reuse.md) · [Face/object cache verification](docs/identity-cache-lifecycle.md)
+
+New confirmations also store an encrypted original-file fingerprint. If a rename or move keeps the URI and original bytes, existing names and marked regions survive. Edits invalidate them; an identical unconfirmed photo stays unconfirmed. Older confirmations need reconfirmation to gain this proof. [Named-reference lifecycle](docs/named-reference-lifecycle.md)
+
+Clothing analysis can reuse verified pixels after rename/move while retaining its model and confirmed-person requirements. GPS is reread after source revision changes because EXIF coordinates can change without changing pixels. [Clothing and GPS verification](docs/garment-location-lifecycle.md)
+
+Open **Sources → Model licenses and notices** to read bundled upstream copyrights, licenses and model cards. [Distribution audit](docs/model-distribution-audit.md) · [Local signing](docs/local-release-signing.md)
+
+The 2,000-real-photo emulator benchmark completed: category top-1/top-5 known-positive hits were 15/20 and 19/20. The scene-only encrypted index occupied 9.75 MiB and reopened in 2.315 seconds without image decoding. Read the [evaluation record](docs/large-gallery-evaluation.md) for false matches, unjudged results, cold-start costs and the limitations of the generated complex-query probes.
+
+Open **Sources → Name suggestions** to review faces and common objects found by the two bundled detectors. Choose **Name this** to confirm a marked area or link it to a **Saved name**. You can also name other subjects from photo detail. Type the saved name or a combination such as “Me and my car” directly in the prompt. A saved place with a GPS-tagged reference also supports “near [place]” after location access is granted. [Named search guide](docs/named-photo-entities.md)
+
+Naming a person or an object opens a review with all confirmed photos and up to 3, 5 or 10 possible matches. An exact name or alias in **Named** search can reopen this review. Use **Confirm match** to add a photo to Named results.
+
+Choose **Allow all photos** and then **Allow all** in the Android dialog to load the gallery in one step. Android also offers limited access on supported versions. Use **Sources → Choose a folder** to authorize a folder and its subfolders independently. Use **Sources → Manage folders** to revoke a folder grant while keeping the original files. The app measures visual similarity with the bundled CLIP encoders and reads text with ML Kit. Encrypted search records are reused on restart when the photo and model revisions match.
+
+Local text and visual search work in airplane mode with the bundled models. Google ML Kit runs OCR on the device and may send SDK diagnostics such as API usage and performance metrics when connected. [Local privacy verification](docs/local-privacy-verification.md) · [ML Kit privacy terms](https://developers.google.com/ml-kit/terms)
+
+When a document provider reports a selected folder as unavailable, the app hides its photos and keeps their encrypted search records. Open **Sources → Manage folders → Retry folders** after reconnecting. The app checks the photo revisions before reusing the records. Removing the folder grant clears the corresponding derived records.
+
+Open **Review cloud copy** from photo detail to inspect a full or redacted copy and approve its exact bytes for the configured worker. The client submits the encrypted job, validates its encrypted result and saves revision-bound text for local search. Source changes invalidate use of the result. [Service setup](docs/cloud-service.md)
+
+## Start here
+
+For the search screen, photo detail, permissions and accessibility, see the [Android UI audit and improvement plan](docs/android-ui-improvement-plan.md).
+
+1. [Planning overview](docs/README.md)
+2. [Blueprint](docs/blueprint.md)
+3. [Complete dependency checklist](docs/implementation-todo.md)
+4. [Model and evaluation plan](docs/model-and-evaluation-plan.md)
+5. [Product roadmap](docs/product-roadmap.md)
+6. [Research and decisions](docs/research-and-decisions.md)
+7. [Stack recommendation and development setup](docs/development-setup.md)
+8. [G0 feasibility results and test commands](docs/g0-feasibility.md)
+9. [Public dataset benchmarks and acceptance conditions](docs/dataset-evaluation.md)
+10. [Search for named things in photos](docs/named-photo-entities.md)
+11. [Privacy review and encrypted OCR worker](docs/hybrid-implementation.md)
+12. [OCR model comparison and remembered-text benchmark](docs/hybrid-ocr-benchmark.md)
+
+The Android client uses Kotlin and Jetpack Compose. Local inference and encrypted storage still require device qualification. Generative LLM/VLM comparison follows the non-generative baseline.
+
+After setting the Windows build environment below, run the repeatable core check with:
+
+```powershell
+python tools/verify_local_core.py --adb "$env:LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe" --serial emulator-5580
+```
+
+This builds and installs on the disposable emulator, runs host and focused Android regressions, and records source/model hashes with the result. Live cloud exchange, model benchmarks and physical-device qualification have separate acceptance commands. Avoid changing sources during the check.
+
+Core real-photo workflows require the permitted fixtures described in the evaluation guides. Prepare the complex nearby fixture from the cached corpus with `python tools/prepare_complex_content_fixture.py`. If missing, use `--source` with the pinned original or explicitly allow `--download` for one 87 KB public image. The preparer checks its exact SHA-256 and stages attribution in ignored build assets. It never imports a phone gallery or bundles the evaluation image in the release app.
+
+## Working here
+
+Use this folder for future photo-app work. The original CueSeal project remains at `D:/secure audio`; do not run its tests as if they validate this application or copy its secrets, data or build outputs here.
+
+Read [AGENTS.md](AGENTS.md) before implementation. Choose a checklist task, satisfy its prerequisites and record actual evidence.
+
+## Build and run
+
+Open this folder in Android Studio, select the bundled JDK for Gradle, and sync the project with Android SDK Platform 37 and Build Tools 36.0.0 installed. Select an authorized Android device and run the `app` configuration.
+
+To see the app on the existing emulator, open **D:\photo-library** in Android Studio, wait for Gradle sync, then open **Tools → Device Manager**. Start **PhotoLibrary_D**, choose it in the device selector, choose the **app** run configuration, and press **Run ▶**. In the app, choose **Allow all photos** and approve Android's gallery dialog. Photos in the emulator are separate from your phone; use the permitted emulator fixtures for verification.
+
+To launch the already-built feasibility app from a terminal on this workstation:
+
+```powershell
+$sdk = Join-Path $env:LOCALAPPDATA 'Android/Sdk'
+$adb = Join-Path $sdk 'platform-tools/adb.exe'
+& $adb -s emulator-5580 get-state
+& $adb -s emulator-5580 install -r 'D:/photo-library/app/build/outputs/apk/feasibility/app-feasibility.apk'
+& $adb -s emulator-5580 shell am start -W -n org.photolibrary.app.feasibility/org.photolibrary.app.MainActivity
+```
+
+Start the AVD in Device Manager first if `get-state` does not report `device`. Keep the explicit emulator serial in automated commands. The feasibility build is for local verification; `app-release-unsigned.apk` requires the intended production signing key before distribution.
+
+For a terminal build on the current Windows workstation, run the following from the project root. Adjust the installation and SDK paths for other workstations. The cache path keeps build downloads on D:.
+
+```powershell
+$env:JAVA_HOME = 'D:\andriod studio\jbr'
+$env:ANDROID_HOME = Join-Path $env:LOCALAPPDATA 'Android/Sdk'
+$env:GRADLE_USER_HOME = 'D:\Android\Gradle'
+python tools/stage_app_clip.py
+python tools/stage_detection_models.py --download
+python tools/stage_identity_models.py --download
+python tools/stage_app_garment.py --download
+.\gradlew.bat :app:assembleDebug :app:lintDebug
+```
+
+The visual search build uses the four pinned files from `app/build/feasibility-models/clip-6b7c523`. The staging command verifies their hashes and copies them to the ignored `.local-models/clip` directory. Use `--source` to point to another copy of those exact files. Without the staged files, named, text and filename search are available.
+
+The detection staging command verifies the YOLOX-Nano and YuNet downloads, labels and licenses, then copies them to `.local-models/detection`. Omit `--download` to stage from the local cache. Inference uses the bundled files and runs offline.
+
+The identity staging command verifies the SFace and DINOv2 model files and license texts before bundling them. The app can still perform confirmed Named searches in a build without these two optional model assets.
+
+The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. To install and launch it with ADB, connect one authorized phone and run:
+
+```powershell
+$adb = Join-Path $env:ANDROID_HOME 'platform-tools/adb.exe'
+& $adb devices -l
+& $adb install -r 'app/build/outputs/apk/debug/app-debug.apk'
+& $adb shell am start -W -n org.photolibrary.app/.MainActivity
+```
+
+The build pins Gradle 9.3.1, Android Gradle Plugin 9.1.1, and the Compose compiler plugin 2.2.10. It uses a provisional minimum of API 30 and target API 36 for the debug scaffold.
+
+## Workspace handoff
+
+Created on 14 November 2026. Copied all six planning documents from `D:/secure audio/docs/photo-library` and verified their hashes before updating workspace-specific references. The old copies remain unchanged as the prior project's planning snapshot; this folder is the working copy going forward.
+
+Added this README, agent instructions and tooling guidance. This completes the folder/document preparation portion of PL013, not Android environment qualification PL014 or feasibility gate PL019. No implementation task is marked fully complete solely because files were copied.
+
+The initial scaffold provided build-tool evidence for PL014. Subsequent work added gallery/folder access, revision-bound local inference and encrypted persistent caches. The workspace handoff above records the initial state; use execution-status.md for current acceptance and remaining work rather than inferring checklist completion from the unchanged scaffold version number.
+
+The 15 November 2026 debug build passed `assembleDebug`, APK signature verification and `lintDebug`. Lint reported zero errors and seven warnings covering newer dependencies, the provisional target API and the launcher icon. On an Android 17 emulator, ADB installed the APK, started `MainActivity` and verified the visible “Photo Library” title. ADB initially detected the Samsung Android 15 phone, but its USB connection dropped before installation. Physical-device launch verification is pending.
+
+Version 0.2.0 passed `assembleDebug` and `lintDebug` with zero lint errors and nine warnings. The Android 17 emulator test used two generated PNGs with airplane mode enabled. It verified both selection routes, case-insensitive filename matching, a decoded detail preview, persistence across process restart, and removal without deleting either original. The APK manifest declares no Internet permission or broad media-read permission. Physical-phone testing remains pending.
+
+The selected-photo OCR workflow contributes to PL040, PL054, PL061, PL062 and PL065. `PhotoProcessor` defines the model boundary. `LocalPhotoIndexer` handles one image at a time, validates the decoded pixel revision and model revision, and closes the processor after each batch. `MlKitPhotoText` supplies bounded text, language and regions. The library screen receives matching photos and progress. On refresh, text becomes searchable again after the current input is checked. A model change requires a new adapter or model configuration at composition. The app's encrypted catalog, durable indexing and complete source lifecycle still have separate prerequisites.
+
+The offline build passed `assembleDebug`, `assembleFeasibility`, `assembleFeasibilityAndroidTest` and `lintDebug` with zero lint errors and ten warnings. On the Android 17 x86_64 emulator, seven focused instrumentation tests and the cached full-photo benchmark passed. In the debug app, the Files route added two generated photos. A visible-text query returned only the intended photo. Removing it cleared the search hit and preserved the original SHA-256. A process restart rebuilt OCR for the remaining selected photo. The debug APK declared no Internet or broad media-read permission. See the [per-photo extraction and search results](docs/dataset-evaluation.md#full-photo-ocr-and-search).
+
+The gallery and folder update contributes to PL037, PL038, PL052 and PL065. `GallerySource` reads the permitted Android MediaStore scope. `FolderSource` reads image documents and subfolders through each persisted folder grant. `PhotoLibrary` merges the sources by canonical MediaStore identity when Android provides a mapping, and the UI rechecks gallery access on resume. Android 17 x86_64 emulator checks covered the native full, limited and denied permission choices, OCR on gallery photos, overlapping sources, nested folders, grant persistence and removal without changing original files. The offline debug and feasibility builds passed, and debug lint reported zero errors and ten warnings. Older Android permission paths and large-gallery performance remain open.
+
+The persistent OCR index contributes to PL025, PL027–PL030, PL035, PL046, PL052–PL054, PL061, PL062 and PL066. SQLCipher 4.20.0 stores photo references, revisions, model identity, and recognized text and regions in the app’s no-backup directory. Android Keystore protects the random database passphrase with authenticated encryption. If the key is missing or invalid, filename search stays available and the app preserves the existing database. No additional app passcode is required to open the index.
+
+Startup reads current access and source metadata, then restores matching rows before processing pending images. MediaStore revisions include the volume version, row generation, date modified and size. Folder revisions use the provider’s modified time and size. Sources without those revision hints require a pixel check before reuse. New or changed photos are saved individually after checking the source again. The source check depends on the provider publishing the edit. The app removes inaccessible or deleted rows during reconciliation.
+
+Ten targeted tests passed on the offline Android 17 x86_64 emulator using generated fixtures. Two initial photos took two decodes and two OCR calls. On reopening the index both counts were zero. Editing one photo took one decode and one OCR call. Deletion removed the saved row without OCR. A force-stop and app reopen restored text search without changing the database file. Revoking gallery access hid the photos and pruned the index while preserving both original fixtures. The app’s database and its active rollback journal lacked the synthetic plaintext markers. A wrong database key, a modified wrapped key and a deleted Keystore alias all failed without replacing the database. The offline build passed with zero lint errors and twelve warnings. Physical-device and large-gallery measurements remain open.
+
+The visual search prototype contributes to PL057–PL060, PL063–PL065, PL067 and PL071. Quantized CLIP ViT-B/32 runs in ONNX Runtime Android 1.26.0. The local tokenizer uses the pinned vocabulary and merges, and image preprocessing uses the pinned normalization values with an Android bilinear center crop. A schema migration adds normalized 512-value image embeddings to the SQLCipher database while preserving existing OCR. The index records the source and model revisions. Queries use cosine ranking and the app shows up to 24 closest matches.
+
+Nine targeted checks passed on the offline Android 17 x86_64 emulator. Token IDs matched the pinned Python tokenizer on five queries. Five known descriptions ranked the matching cached photo first, including a red-scarf pug among two dogs. Reopening and pruning the encrypted embeddings used zero image decodes. In the app UI, the pug ranked first before and after a force-stop, the encrypted database hash stayed the same, and exact OCR search still found the existing fixture. The offline build passed with zero lint errors and thirteen warnings. The bundled debug APK is about 348 MB. This five-photo test verifies the flow. The separate [object identity benchmark](docs/named-photo-entities.md#object-identity-benchmark) evaluates held-out views and lookalikes.
+
+The named workflow advances PL064, PL065, PL070 and PL071. The Kotlin `subjects` package resolves names and query clauses, `NamedSubjectStore` persists confirmations and college selections in SQLCipher, and `PhotoSubjects` and `PhotoLocations` check media revisions and optional original location metadata. See the [workflow, Android 17 evidence and remaining dependencies](docs/named-photo-entities.md#emulator-verification).
+
+Model-generated proposals extend PL057, PL064, PL065, PL070 and PL071. The `detection` package runs the pinned object and face models through ONNX Runtime. `PhotoDetectionScan` validates accessible media revisions and publishes temporary review cards. `SuggestionReviewScreen` hands a model-marked area to the existing encrypted confirmation flow. The offline Android 17 verification passed 14 tests and the on-screen flow from a detected face to a Named result. Additional subject-specific detection, identity matching and physical-device measurements remain open.
+
+Ranked identity review advances PL057, PL064, PL065, PL070 and PL071. The Kotlin `identity` package provides aligned face and object features, `IdentityMatcher` ranks photo regions, and `IdentityReviewScreen` presents confirmations and suggestions. Android 17 x86_64 passed 16 targeted offline tests. Personalized ranking for other subject types and physical-device timing remain open. See the [results and fixture setup](docs/named-photo-entities.md#ranked-review-for-a-saved-identity).
+
+The expanded benchmark advances PL058, PL069 and PL071. `IdentityBenchmarkTest` evaluates 48 PubFig83 face identities and 48 Objectron object tracks on the emulator, using the same encoders, region scoring and source checks as the app. See the [dataset protocol, results and reproduction commands](docs/identity-benchmark.md).
+
+Encrypted identity caching advances PL060, PL067, PL069 and PL070. The schema migration adds face and object caches. Repeated scans check fresh metadata, reopen the encrypted index and reuse both gallery and reference features. On the same Android 17 fixtures, repeat medians were 0.838 s for faces and 0.819 s for objects with zero inference calls and identical rankings. See the [cold and repeat scan results](docs/identity-benchmark.md#encrypted-materialized-identity-features).

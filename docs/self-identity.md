@@ -1,0 +1,15 @@
+# Explicit self selection
+
+PL064 now has an explicit self selection for personal searches. This allows a person to keep their saved name, choose This is me, and use me, myself or my photos in queries. Selection does not identify a human automatically, verify the phone owner's identity, create an account, alter existing names or confirm any additional photo.
+
+The store API is NamedSubjectStore.setSelf(subjectId: Long?): Boolean. It accepts an existing PERSON or null to clear. Non-person and missing IDs return false without altering the current choice. Reconcile returns a NamedLibrary with the encrypted setting. Replacing or clearing self changes only this preference; photo confirmations and marked regions remain intact.
+
+Schema11 adds a singleton self_identity table in the existing SQLCipher database. No row means legacy behavior: one unambiguous PERSON named Me or with a Myself alias can supply the self binding. A row with a person ID is an explicit choice. A row with a null ID is an explicit clear and must not silently restore the legacy binding after restart. NamedLibrary's trailing selfIdentity parameter defaults to null to preserve existing construction and legacy behavior. The value type SelfIdentity(subjectId: Long?) distinguishes explicit clear from a missing setting.
+
+An explicit setting reserves me/myself pronouns and overrides literal labels belonging to an older different subject. Explicit clear removes those pronoun bindings, even if someone still has the saved name Me or Myself. Their name records, aliases and references remain unchanged; other names/aliases still retrieve them. A selected person whose confirmed photos lose access remains selected but contributes no inaccessible or newly invented photo references.
+
+SelfIdentityDialog(named, saving, onDismiss, onSave) lists saved people with confirmed references and retains the current selection if its references are temporarily absent. It shows the current binding, permits replacement and clear, and explains that this is a search preference rather than identity verification. The root owns ViewModel/menu/screen integration. R.string.self_identity_title and self_identity_action label the entry and action; self_identity_error is available for a stale/missing selection.
+
+SelfIdentityTest passed all five cases on emulator-5580: store replacement/clear/reopen, explicit pronoun precedence, ambiguous legacy labels, invalid selections, copied-database plaintext absence, lost photo scope without resurrection, and migration from schema10. SelfIdentityWorkflowTest also passed the actual Sources dialog, selecting and replacing normally named people, clearing and reopening, and confirmed-only personal queries without changing photo confirmations. This is a search preference, not an authentication test.
+
+The coordinated run passed 58 Android cases with one opt-in location-scale skip, all 25 host checks and Kotlin build/lint. Its exact source/model/APK hashes and per-class transcripts are preserved in app/build/self-nearby-verification/receipt.json. No phone access, cloud upload, new dataset download or signing operation was performed for this pass.

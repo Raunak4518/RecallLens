@@ -1,0 +1,25 @@
+# Confirmed references and metadata changes
+
+PL044 now preserves existing Named references across same-URI metadata changes using a proof specific to confirmation. When a user confirms a subject, PhotoSubjects streams the original file through SHA-256, checks the source revision before and after reading, and stores the digest with that confirmation's source revision. SQLCipher schema 8 adds named_photo_content. It stores one small proof per named photo, with no additional image copies. Keystore key wrapping and database encryption are unchanged.
+
+When a source revision changes, the app hashes only a referenced photo with an existing proof. Equal original bytes allow the named references and marked regions to move to the new revision. The transaction checks the previous proof and an existing reference again. A removed or superseded confirmation cannot be resurrected by a late hash result. The subsequent source check and reconciliation remove references if access or revision changed during verification.
+
+The fingerprint reader uses a 64 KiB buffer, closes its stream on cancellation/failure, and propagates coroutine cancellation. Unchanged known source revisions require no new hash. This bounds buffer memory; it does not establish ARM latency or energy cost for large originals. Current ViewModel operations run this work on Dispatchers.IO.
+
+Providers without a reliable source revision require original-file validation on each refresh of a confirmed photo with a proof, even when the decoded-pixel revision is unchanged. Otherwise a file/EXIF change invisible to the bounded decoded image could retain a stale confirmation. A changed digest or read failure removes the reference. PhotoSubjects depends on the two-method PhotoReferenceSource access contract, implemented by PhotoLibrary. The regression holds the decoded revision constant while changing original bytes and verifies invalidation. The eight-test confirmation/fingerprint run passed on emulator-5580 in 91.886 seconds; see app/build/identity-source-guard-regression.txt.
+
+An edit, failed read, inaccessible source or mismatching hash follows normal invalidation. An unavailable source with a retained grant follows the existing hidden-retention policy. Removing the last confirmation prunes its proof. Identical bytes at another URI never create a confirmation there. Unconfirmed suggestions remain excluded from Named search.
+
+Schema 7 migrates without inventing proofs for legacy confirmations. Those confirmations work while their revision matches, but a later revision change invalidates them conservatively. Reconfirming a photo creates a proof. Copies and cross-volume moves that change the URI remain separate lifecycle work.
+
+This full-file fingerprint is different from the bounded decoded-input fingerprint used for OCR and scene-cache reuse. It does not migrate cloud approval, cloud results, garment evidence, location data or identity-encoder caches. A changed EXIF field also changes the original-file hash and therefore invalidates confirmation under this conservative policy.
+
+Identity encoders now have their own [decoded-input cache lifecycle](identity-cache-lifecycle.md); they do not use the full-file Named proof to authorize model-output reuse.
+
+Implementation boundaries are PhotoContentFingerprint.kt for streaming and revision validation, PhotoLibrary.contentDigest for permitted source access, PhotoSubjects for workflow decisions, and NamedSubjectStore for transactional proof/reference storage. EncryptedPhotoIndex owns schema migration. The core verifier includes the fingerprint and real MediaStore lifecycle acceptance classes.
+
+The generated MediaStore fixture gives the user two confirmed subject labels and regions on one image and leaves a second identical image unconfirmed. It exercises rename, same-volume move, encrypted reopen, stale selection rejection, edit invalidation, scope removal and late-result suppression. It validates confirmation lifecycle rather than face/object model accuracy. The existing real-photo IdentityMatchingTest separately checks model ranking, cached reuse and confirmed-only search.
+
+On Android 17 x86_64 emulator-5580, the initial ten-test run passed the eight storage/lifecycle/fingerprint/schema-7 checks. Both identity tests failed because their schema-4 fixture lowered the version while retaining later tables. The fixture now drops the post-v4 tables before simulating that version. The corrected face/object tests and the proof-storage test passed together: OK (3 tests), 66.875 seconds. The proof test checks that its digest and table name are absent from raw database bytes while the record still exists. Test transcripts are app/build/named-content-proof-regression.txt and named-content-proof-final-regression.txt.
+
+Build/lint passed in named-content-proof-build.txt and named-content-proof-final-build.txt. Both ARM64 release artifacts and all ten static package checks passed in named-content-proof-release-build.txt and release-inspection/results.json. Production signing, physical ARM cost, new-URI continuity and safe reuse of other derived records remain pending.

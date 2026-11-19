@@ -1,0 +1,11 @@
+# Live source changes
+
+PL042, PL043 and PL070 use PhotoSourceObserver while MainActivity is started. It watches MediaStore and the current document-tree grants, observes this app's relevant AppOps modes, and registers the API 30 storage-volume callback. Events invalidate the previous listing. A 350 ms debounce starts the existing reconciliation flow, which rechecks permitted photos and revisions before restoring caches or scheduling work.
+
+Folder listeners are updated after each source listing. Stopping the activity unregisters content, storage and AppOps listeners and removes the pending debounce callback. The ViewModel closes the observer when cleared. Resume refreshes the gallery to cover changes made while observation was stopped. A document provider must deliver notifications for live changes to be observed while the activity is open. [ContentObserver API](https://developer.android.com/reference/android/database/ContentObserver) · [Storage volume callbacks](https://developer.android.com/reference/android/os/storage/StorageManager#registerStorageVolumeCallback(java.util.concurrent.Executor,android.os.storage.StorageManager.StorageVolumeCallback))
+
+The Android 17 x86_64 test starts a ViewModel and its observer, then inserts a generated MediaStore photo without calling refresh again. It waits for the photo to appear, renames it, trashes it, restores it and permanently deletes it. It verifies that the photo disappears and returns in response to notifications. A SHA-256 comparison verifies unchanged pixels through rename and trash/restore. After stopping observation, another notification leaves the source refresh revision unchanged.
+
+The live-source test passed. Its first run exposed a duplicate deletion in test cleanup, which was corrected before rerunning. The separate screen regression exposed an assumption that a photo had already been copied into the emulator's private fixture directory. That test now loads the attributed photo from instrumentation assets into a unique temporary cache file and removes it during cleanup.
+
+Build and test artifacts are app/build/source-observer-final-build.txt, source-observer-regression.txt and source-observer-workflow-regression.txt. Physical storage callbacks, other document providers and the full permission-transition device matrix remain pending.

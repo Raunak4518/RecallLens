@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "events": [
+    {
+      "name": "Diwali",
+      "aliases": ["Diwali", "Deepavali", "Deepawali", "दिवाली", "दीपावली"],
+      "zone": "Asia/Kolkata",
+      "visual_query": "a photo of a Diwali celebration with lit diya oil lamps or colorful rangoli",
+      "dates": [
+        {"day": "2025-10-20", "source": "https://cag.gov.in/en/pages/single/4696"},
+        {"day": "2026-11-08", "source": "https://www.cgca.gov.in/ccadl/list-of-holiday"}
+      ]
+    }
+  ]
+}

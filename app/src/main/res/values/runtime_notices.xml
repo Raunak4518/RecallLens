@@ -1,0 +1,11 @@
+<resources>
+    <string name="runtime_notices_empty_document">This upstream notice file is empty.</string>
+    <string name="runtime_notices_title">App licenses and notices</string>
+    <string name="runtime_notices_scope">%1$d dependency records · %2$d distinct notice documents</string>
+    <string name="runtime_notices_incomplete">These are identified runtime notices. Some component and native-library attribution remains under review. Model notices are listed separately.</string>
+    <string name="runtime_notices_loading">Loading notice…</string>
+    <string name="runtime_notices_error">This notice could not be opened or verified.</string>
+    <string name="runtime_notices_back">Back to app notices</string>
+    <string name="runtime_notices_components">Used by %1$d component records</string>
+    <string name="runtime_notices_provenance">Component versions and notice sources</string>
+</resources>

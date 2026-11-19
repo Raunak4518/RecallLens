@@ -1,0 +1,24 @@
+<resources>
+    <string name="feedback_learning">Search learning</string>
+    <string name="feedback_learning_off">Allow this phone to save future result ratings and the searches they belong to in the encrypted index. Similar searches may use these ratings to change their order. With learning off, ratings last only for the current search.</string>
+    <string name="feedback_learning_on">This phone uses your saved ratings to personalize results. Turning learning off erases all saved search ratings and resets their ranking effects.</string>
+    <string name="feedback_disable">Turn off and erase</string>
+    <string name="feedback_enable">Allow local learning</string>
+    <string name="feedback_unavailable">Saved feedback is unavailable. Check device storage and try again.</string>
+    <string name="feedback_wrong_recorded">Hidden for this search</string>
+    <string name="feedback_found_recorded">Marked as found</string>
+    <string name="feedback_undo">Undo</string>
+    <string name="feedback_result">Rate result</string>
+    <string name="feedback_wrong">Wrong result</string>
+    <string name="feedback_found">Found it</string>
+    <string name="feedback_captured_relative">Captured %1$s</string>
+    <string name="feedback_add_reason">Add a reason</string>
+    <string name="feedback_reason_person">Wrong person</string>
+    <string name="feedback_reason_object">Different object</string>
+    <string name="feedback_reason_attribute">Wrong detail or relationship</string>
+    <string name="feedback_reason_text">Text or document mismatch</string>
+    <string name="feedback_reason_time_place">Wrong time or place</string>
+    <string name="feedback_reason_duplicate">Duplicate result</string>
+    <string name="feedback_reason_other">Other or unsure</string>
+    <string name="feedback_review_regions">Review photo regions</string>
+</resources>

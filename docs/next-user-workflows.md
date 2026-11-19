@@ -1,0 +1,74 @@
+# Next user workflows and a larger real-photo evaluation
+
+Reviewed against current Kotlin sources and the user's photo-search requirements on 18 November 2026. This is a work proposal, not a claim that the following features or experiments are complete. The active verifier freezes app/src, tools, workers and models; this document and the external benchmark staging are outside that source set.
+
+## Current status after this proposal
+
+The partial Content slice is implemented and verified, including generic spatial/logic feedback, confirmed-name scoping, strict Named behavior, stale cache-publication protection and the corrected current-gallery coverage denominator. Explicit self selection and bounded complex nearby composition are also implemented. Their coordinated run passed 58 Android checks with one opt-in skip, 25 host checks and build/lint. Read self-and-complex-location-plan.md, partial-content-search.md and execution-status.md for source-specific receipts. General time/relation verification and a judged personal-query cohort remain open. The2,000-real-photo scene baseline also completed, with its generated-prompt limitations recorded in large-gallery-evaluation.md.
+
+## Original rationale for the first slice
+
+Content search should offer useful approximate results when a complex query contains unsupported predicates, without presenting those results as fully verified matches. The current PhotoQueryPlan returns requirements for missing identity, unsupported clothing/subtype or spatial relations; groupPhotoResults then prevents scene ranking because canRankContents is false. This is safe but gives no content result for a query such as “me in a red shirt in front of my car near Surat” when one relation is unsupported.
+
+Implement a separate approximate-content plan that retains the unmet requirements and requests top-k scene similarity in Content mode. Where the query contains an unambiguous saved person/object name, constrain candidates to those confirmed subjects rather than treating arbitrary cars or faces as the user's. Where a supported nearby place filter is available, use its validated radius candidates. If a required named entity has no confirmed references, show that missing evidence explicitly rather than claiming a personal match. Unsupported spatial/subtype clauses remain displayed as unchecked. Results must be grouped as related/partial content matches, with no verified full-conjunction claim. Named mode remains strictly confirmed-only and does not gain an approximate fallback.
+
+Dependencies are existing query snapshots/cancellation, NamedLibrary references, current PhotoLocations validation and cached scene vectors. No new model is required to implement this useful fallback. Tests must cover a known person plus an unsupported relation, same-color/lookalike distractors, missing self enrollment, unknown saved objects, absent place references, inaccessible photos, no semantic model available, stale out-of-order completion and strict Named behavior. A real-photo judged prompt cohort must measure whether this actually retrieves useful results; a passing grouping test proves semantics only.
+
+## Audited priority list
+
+| Order | Work | Present evidence/gap | Dependency and completion evidence |
+| --- | --- | --- | --- |
+| 1 | Complex-query partial Content results | Initial slice implemented;28 logic checks and2 final UI reruns pass | Query publication guards; clearly labeled related results and known-entity filters, judged complex queries, Named unchanged |
+| 2 | Explicit “this is me” enrollment | Implemented in Sources; encrypted schema11,5 store cases and1 real UI workflow passed | Select/replace/clear/reopen without changing confirmations; legacy inference retained only while no explicit choice exists; see self-identity.md |
+| 3 | One search entry with evidence groups | UI still exposes Content/Text/Named chips and mode-dependent examples | Preserve optional strict Named filter, expose recognized constraints, test OCR/scene/name queries and grouping without hiding uncertainty |
+| 4 | Rename/edit saved identities and aliases | Store can insert subjects and remove photo references; no complete label-management workflow | Atomic uniqueness/history policy, confirmed references preserved through rename, changes persist, no duplicate labels |
+| 5 | Explain coverage per task and task failures | Durable counters exist; OCR/scene/identity/clothing coverage has different scopes | Accurate source-revision/model coverage, explain pending vs unavailable vs failed and retries; no fake percentage from total gallery alone |
+| 6 | Larger grounded retrieval evaluation | OCR300, identity48 enrollment queries/domain and garment24 are distinct cohorts | Frozen real-gallery manifest and meaningful labels; per-family metrics and explicit unknown judgments, no test tuning |
+| 7 | Cross-volume/new-URI identity | Same-URI metadata continuity is implemented; copies/new URIs remain separate | Byte/content grouping, independent access grants, late result tests; never transfer confirmation by filename alone |
+| 8 | Actual privacy and lock policy | Keystore wrapping/SQLCipher exist; first-unlock/app-auth policy remains a release requirement | Threat boundary and recovery choice, foreground/background behavior, lock/revoke/copy tests; no invented runtime protection guarantee |
+| 9 | Physical ARM device qualification | Existing emulator timing is not battery/thermal or ARM evidence | Authorized physical test device; cold/warm/sustained memory, latency, energy, thermal and real index footprint |
+| 10 | Later VLM and production gates | Required later LLM/VLM comparison and public-service/signing operational work remain open | Licensed candidate and frozen query cohort first; compare measured benefit, disclosure and cost; signing/TLS/retention/support acceptance |
+
+The original dependency checklist is an acceptance roadmap, not a count of implemented classes. Existing partial checks do not justify ticking a gate whose prerequisites or physical evidence remain missing. The blueprint's opening “design only” status and original face-identification exclusion are historical; the current README/execution receipts and subsequent explicitly requested named-person workflow describe the actual app. Reconcile those planning statements before a release handoff rather than presenting conflicting claims.
+
+## Verified source choices for the larger corpus
+
+Open Images provides downloadable per-ID subsets, human-verified image labels, object boxes and visual relationships. Its publishers distinguish positive and negative class judgments; annotation absence is not a negative label. Photo metadata includes attribution and listed image licenses. The official license page lists annotations under CC BY 4.0 and images as CC BY 2.0, and explicitly requires users to verify each image's license independently. This project records the metadata and keeps downloaded corpora out of release assets; publisher metadata checks are not described as an independent Flickr-rights audit. Sources: [official downloads](https://storage.googleapis.com/openimages/web/download_v7.html), [annotation formats](https://storage.googleapis.com/openimages/web/download_v7.html#data-format), [license statement](https://storage.googleapis.com/openimages/web/factsfigures_v7.html#licenses).
+
+HierText supplies word/line/paragraph transcriptions on 11,639 Open Images photos and its release is CC BY-SA 4.0. Its existing 300-photo local corpus provides remembered-text queries; it is not new independent test data after repeated candidate evaluation. [Authors' release](https://github.com/google-research-datasets/hiertext).
+
+Objectron supplies multiview object clips and explicit instance grouping, supporting exact-object studies. Its C-UDA 1.0 data terms differ from software/weight licenses. Frames from one video must not cross enrollment/tuning/final-test partitions as supposedly independent scenes. Existing object fixtures remain a separate cohort; no claim that Open Images category labels identify a user's exact object. [Authors' dataset and sizes](https://raw.githubusercontent.com/google-research-datasets/Objectron/master/README.md), [data license](https://raw.githubusercontent.com/google-research-datasets/Objectron/master/LICENSE).
+
+## Cached corpus inventory
+
+Current checked files: selective OCR has 300 JPEGs totaling 89,683,655 bytes; identity face has 179 JPEGs totaling 604,866 bytes; identity object has 144 JPEGs totaling 13,217,905 bytes. The full public-evaluation tree contains 782 image files totaling 126,555,239 bytes, including crops/reused images. These are file counts, not 782 unique independent original photos. Garment cohort v1 contains 24 photos totaling 6,058,164 bytes, with a duplicate evaluation-policy directory that must not be counted as another cohort.
+
+## Grounded 2,000-photo benchmark preparation
+
+The staged preparer freezes 2,000 eligible Open Images validation IDs before inference: up to 800 with official relationship annotations, with the rest selected deterministically from the broader metadata pool. Downloads, per-image hashes, author/title/source/license, rotation, explicit positive/negative labels and relationship rows are stored outside app source under .benchmark-data/gallery-v1. Eight download threads, an 8 MiB/image bound, a 2 GiB corpus budget and a free-space gate limit storage. Failures are recorded without substituting model-favored examples. Actual successful count and bytes must come from the final manifest. The completed v1 run and its query-design limitations are recorded in large-gallery-evaluation.md; preparation status below is historical.
+
+The staged finalizer groups equal SHA-256/source URLs before assigning validation/test, preventing those duplicate groups from straddling the split. Category queries and two-category “containing A and B” queries have positive sets and explicit negatives. Other IDs stay unjudged. Relationship queries use official subject/relation/object annotations and boxes, but are positive-only unless independently reviewed negatives are added. Missing relationship rows cannot become negative examples.
+
+The staged emulator bridge imports each verified photo into a disposable MediaStore fixture, runs actual local CLIP indexing into a private encrypted store, records decode/index/import/query/ranking time and bytes, verifies warm readback without image decoding, and emits complete rankings. The host report distinguishes known top-k positives, explicit false alerts and unjudged results. It does not tune a threshold or manufacture semantic recall from unjudged images. This is a scale/scene baseline, not validation of every personal complex prompt. Source import changes only the generated fixture originals, and cleanup removes those URI records after the run.
+
+The bridge requires emulator free space for three image copies plus a 1 GiB reserve, pauses normal durable indexing during benchmark work, and streams instrumentation output to disk. A staged --resume path retains the same fixture and frozen manifest, reuses generated MediaStore originals/cache entries, and repairs partial fixture copies. Interrupted benchmark work intentionally leaves app indexing paused until resumed; only a completed run restores its prior pause state and cleans its own generated resources. Kill/resume acceptance and Kotlin compilation remain required before calling this path verified. The preparer/host scripts pass Python syntax compilation; they are not automatically part of the app or the core verifier.
+
+## Query families and required truth
+
+| Family | What existing public annotations can support | Truth still needed |
+| --- | --- | --- |
+| Generic scene/object conjunction | Verified categories, boxes and positive relationships | Reviewed hard wording/paraphrases and relation negatives |
+| Remembered text | HierText transcriptions and target image IDs | User-like remembered phrases, joined/misspelled text, multilingual and difficult new images |
+| Specific person/self/group | Existing identity fixture grouping, explicit app confirmation | Broader consenting/licensed people across occasions; enrollment/query separation; all requested group members |
+| Person and garment color | Person/face regions plus reviewed garment ownership/color | Annotate which person owns the garment; same-colored/lookalike negatives, uncertain light/occlusion |
+| Exact named object | Objectron clip/instance IDs and explicit confirmation | Independent occasions, same model/color distractors; ownership is a user confirmation rather than a dataset category |
+| Place/nearby | Controlled GPS metadata verifies radius workflow | Real location evidence or independently annotated landmarks; Open Images labels do not prove Surat or the user's college |
+| Time and college history | Stored explicit college sequence can verify previous/current labels | EXIF capture-time provenance, timezone/unknown-date handling and dated organization history before time claims |
+| Memes/documents | OCR and reviewed scene labels can support broad content | Specific meme templates/document types and handwritten/low-quality hard negatives |
+| Full personal conjunction | Intersection of all separately grounded predicates on the same photo/person | Independent reviewed examples spanning person + garment + exact object + place/time; no synthetic ground truth from model predictions |
+
+Review 100–200 complex prompts with at least two readers, include absent and near-miss queries, freeze them before final evaluation, and hold all final-test predictions from routing/threshold selection. Keep validation/error-analysis and final-test reports separate. A corpus of thousands is useful only when its annotations support the claimed questions.
+
+## Current implementation pass: partial Content results
+
+Plan for PL064/PL065, after the complete v1 scene benchmark: retain missing-evidence feedback while allowing cached CLIP ranking only in Content mode. Limit affirmative saved-person/object conjunctions to confirmed reference intersections before top-k ranking. Do not impose that intersection on unsupported negation or alternatives; keep those results explicitly partial. Named stays confirmed-only. Add a visible partial-result label, domain tests for access/name/scope behavior and a real-photo ViewModel/UI test using an explicitly named person plus an unsupported spatial relation. Reuse existing public fixtures and do not alter models, cloud defaults or the frozen benchmark. Validation includes query-publication races, Named behavior, host checks and build/lint. Nearby predicates inside an unsupported complex expression remain unverified in this pass, with explicit feedback; do not claim a complete relation engine.

@@ -1,0 +1,52 @@
+{
+  "OpenAI-CLIP-MIT.txt": {
+    "url": "https://raw.githubusercontent.com/openai/CLIP/main/LICENSE",
+    "sha256": "987e63b32f6c89ff5160e429458a872ff048e6860b590a3912e938f9da8f14db",
+    "bytes": 1064
+  },
+  "Xenova-CLIP-pinned-model-card.md": {
+    "url": "https://huggingface.co/Xenova/clip-vit-base-patch32/raw/6b7c523703ae26e39be4b03774966f8571c7f523/README.md",
+    "sha256": "ae287015b60eb7ca1d40e726c550af1988977c24f0005f123274d52490c20d8d",
+    "bytes": 1417
+  },
+  "OpenAI-CLIP-model-card.md": {
+    "url": "https://raw.githubusercontent.com/openai/CLIP/main/model-card.md",
+    "sha256": "7baf04f60c6234b301ec2c9ca39e67a3ca54b47c05e9509bddf732cbcbec8b7f",
+    "bytes": 7733
+  },
+  "DINOv2-MODEL_CARD.md": {
+    "url": "https://raw.githubusercontent.com/facebookresearch/dinov2/main/MODEL_CARD.md",
+    "sha256": "70ca59606bee0a5fbb1baec80e7e29a93cd7cfbe26ca1910c52a852c4aab09d0",
+    "bytes": 9152
+  },
+  "sface-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/opencv/opencv_zoo/48b10fa505aeb51fbd127fc60a5c660040e823b7/models/face_recognition_sface/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "bytes": 11358,
+    "source": "byte-for-byte existing staged asset"
+  },
+  "dinov2-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/facebookresearch/dinov2/main/LICENSE",
+    "sha256": "600cc67cc4cb2f5ea317dcfc687ad1c74dc4bec8782bbe9db0afd83513b935b7",
+    "bytes": 11359,
+    "source": "byte-for-byte existing staged asset"
+  },
+  "yunet-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/opencv/opencv_zoo/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet/LICENSE",
+    "sha256": "c83b8120c50ccbd4c4f96edf53141bdd566ebb8f8e9227e415326aa1b1aba958",
+    "bytes": 1085,
+    "source": "byte-for-byte existing staged asset"
+  },
+  "yolox-LICENSE.txt": {
+    "url": "https://raw.githubusercontent.com/Megvii-BaseDetection/YOLOX/0.1.1rc0/LICENSE",
+    "sha256": "577c03d505ec80f667ebf96ebd0cc4f6825c817ca1088ee348c48aaabd51bd92",
+    "bytes": 11352,
+    "source": "byte-for-byte existing staged asset"
+  },
+  "Apache-2.0.txt": {
+    "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "bytes": 11358,
+    "source": "byte-for-byte existing staged asset"
+  }
+}

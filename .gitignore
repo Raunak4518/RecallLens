@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+.idea/
+.local-models/
+**/build/
+__pycache__/
+local.properties
+*.jks
+*.keystore
+*.p12
+*.dpapi
+*.idsig
+.benchmark-data/
+.agent-staging/

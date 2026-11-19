@@ -1,0 +1,3 @@
+<resources>
+    <string name="query_location_unverified">Photo locations have not been verified for this request.</string>
+</resources>

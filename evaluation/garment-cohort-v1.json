@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "annotation_note": "Single-reviewer coarse face boxes and visible upper-garment colors, assigned from source photos before this expanded model run. Multiple colors denote visibly present outer/inner garments or patterns. Labels are provisional and require independent review. No cross-photo identity labels.",
+  "max_image_edge": 1600,
+  "images": [
+    {"image_id":"bc2981b1fcbdaecf","scenario":"separated people with different clothing","annotations":[
+      {"face":[0.02,0.565,0.16,0.675],"colors":["BEIGE","ORANGE"]},
+      {"face":[0.29,0.53,0.41,0.65],"colors":["WHITE"]},
+      {"face":[0.695,0.595,0.795,0.69],"colors":["WHITE"]},
+      {"face":[0.82,0.58,0.95,0.685],"colors":["RED","PURPLE"]}
+    ]},
+    {"image_id":"a5201f0a7a529e3f","scenario":"seated panel behind table","annotations":[
+      {"face":[0.275,0.50,0.332,0.605],"colors":["BLACK","WHITE"]},
+      {"face":[0.48,0.48,0.539,0.58],"colors":["BEIGE","BLACK"]},
+      {"face":[0.731,0.47,0.81,0.58],"colors":["BLACK","WHITE"]}
+    ]},
+    {"image_id":"a352e82bdead6f0a","scenario":"five seated people in checked and plain garments","annotations":[
+      {"face":[0.12,0.31,0.212,0.45],"colors":["BLUE","BLACK"]},
+      {"face":[0.325,0.365,0.385,0.48],"colors":["GRAY","BROWN","WHITE"]},
+      {"face":[0.472,0.397,0.521,0.487],"colors":["BLUE","WHITE"]},
+      {"face":[0.657,0.401,0.698,0.48],"colors":["WHITE","BLUE"]},
+      {"face":[0.802,0.349,0.847,0.44],"colors":["BLACK","WHITE"]}
+    ]},
+    {"image_id":"490afae9ff9e98a6","scenario":"panel with green garment beside dark suits","annotations":[
+      {"face":[0.18,0.335,0.228,0.417],"colors":["BLACK","WHITE","RED"]},
+      {"face":[0.408,0.365,0.449,0.443],"colors":["GREEN"]},
+      {"face":[0.675,0.34,0.719,0.415],"colors":["BLACK","WHITE","YELLOW"]},
+      {"face":[0.855,0.356,0.906,0.435],"colors":["BROWN","BEIGE","WHITE"]}
+    ]},
+    {"image_id":"6e67af67fe64e0d0","scenario":"overlap with black and white garments","annotations":[
+      {"face":[0.145,0.29,0.215,0.407],"colors":["BLACK"]},
+      {"face":[0.431,0.295,0.505,0.443],"colors":["WHITE"]},
+      {"face":[0.620,0.239,0.669,0.344],"colors":["BLACK"]},
+      {"face":[0.733,0.22,0.80,0.373],"colors":["BLACK"]}
+    ]},
+    {"image_id":"4a17b4c03c078c3d","scenario":"touching people with layered jackets","annotations":[
+      {"face":[0.33,0.185,0.487,0.305],"colors":["WHITE","RED"]},
+      {"face":[0.515,0.13,0.67,0.282],"colors":["BLACK","BLUE"]}
+    ]},
+    {"image_id":"04f9cd384b8aa388","scenario":"crowded children and adult behind banner","annotations":[
+      {"face":[0.04,0.32,0.091,0.40],"colors":["WHITE"]},
+      {"face":[0.162,0.26,0.205,0.34],"colors":["WHITE"]},
+      {"face":[0.27,0.354,0.315,0.425],"colors":["WHITE"]},
+      {"face":[0.337,0.167,0.377,0.25],"colors":["BLACK","WHITE"]},
+      {"face":[0.40,0.25,0.452,0.348],"colors":["BLACK","WHITE"]},
+      {"face":[0.50,0.18,0.529,0.28],"colors":["WHITE"]},
+      {"face":[0.542,0.338,0.587,0.43],"colors":["WHITE"]},
+      {"face":[0.603,0.145,0.637,0.229],"colors":["WHITE"]},
+      {"face":[0.626,0.365,0.667,0.439],"colors":["WHITE"]},
+      {"face":[0.715,0.32,0.76,0.408],"colors":["WHITE"]},
+      {"face":[0.856,0.356,0.898,0.438],"colors":["WHITE"]},
+      {"face":[0.10,0.545,0.16,0.65],"colors":["WHITE","RED"]},
+      {"face":[0.897,0.65,0.941,0.74],"colors":["WHITE"]}
+    ]},
+    {"image_id":"a93c8fe0e15346d6","scenario":"overlapping matching uniforms and gray jacket","annotations":[
+      {"face":[0.268,0.25,0.326,0.36],"colors":["YELLOW","BLACK"]},
+      {"face":[0.436,0.20,0.491,0.31],"colors":["YELLOW","BLACK"]},
+      {"face":[0.583,0.30,0.633,0.415],"colors":["YELLOW","BLACK","RED"]},
+      {"face":[0.718,0.249,0.777,0.355],"colors":["GRAY","YELLOW"]}
+    ]},
+    {"image_id":"d948faf8ce7aacd3","scenario":"musicians with instrument occlusion","annotations":[
+      {"face":[0.245,0.121,0.355,0.30],"colors":["BEIGE","BLACK"]},
+      {"face":[0.724,0.15,0.805,0.31],"colors":["BLACK","WHITE"]}
+    ]},
+    {"image_id":"1f7c30f0c24fda91","scenario":"mustard garment and instrument","annotations":[
+      {"face":[0.43,0.20,0.561,0.43],"colors":["YELLOW","BROWN"]}
+    ]},
+    {"image_id":"38a757a4b1fc4775","scenario":"overlapping sunglasses and patterned clothing","annotations":[
+      {"face":[0.11,0.0,0.355,0.41],"colors":["BLACK","GREEN","RED"]},
+      {"face":[0.498,0.28,0.623,0.60],"colors":["BLUE","RED"]},
+      {"face":[0.563,0.47,0.715,0.739],"colors":["BLUE","RED"]}
+    ]},
+    {"image_id":"1c1d82cfa671c690","scenario":"overlapping white robes and dark suit","annotations":[
+      {"face":[0.105,0.42,0.184,0.54],"colors":["BLACK"]},
+      {"face":[0.424,0.414,0.51,0.584],"colors":["WHITE"]},
+      {"face":[0.664,0.476,0.741,0.63],"colors":["WHITE"]}
+    ]},
+    {"image_id":"0569d065055bafb6","scenario":"earlier smoke green and warm gray","annotations":[
+      {"face":[0.29,0.17,0.48,0.43],"colors":["GREEN"]},
+      {"face":[0.57,0.36,0.72,0.59],"colors":["GRAY","BEIGE"]}
+    ]},
+    {"image_id":"87566e496632db67","scenario":"earlier smoke arm wrestling","annotations":[
+      {"face":[0.18,0,0.44,0.4],"colors":["WHITE"]},
+      {"face":[0.61,0,0.94,0.43],"colors":["RED"]}
+    ]},
+    {"image_id":"b03c06fee07435de","scenario":"earlier smoke white and pink shirts","annotations":[
+      {"face":[0.34,0.07,0.52,0.42],"colors":["WHITE"]},
+      {"face":[0.75,0.06,0.96,0.45],"colors":["WHITE"]},
+      {"face":[0.06,0.12,0.24,0.43],"colors":["PINK"]}
+    ]},
+    {"image_id":"444183da0584478c","scenario":"earlier smoke single black coat","annotations":[
+      {"face":[0.4,0.03,0.64,0.22],"colors":["BLACK"]}
+    ]},
+    {"image_id":"0ab7e9447e130e75","scenario":"food negative","negative_control":true,"annotations":[]},
+    {"image_id":"692a51d2545bc83b","scenario":"wood negative","negative_control":true,"annotations":[]},
+    {"image_id":"35f80ab5f564b6e9","scenario":"horse negative","negative_control":true,"annotations":[]},
+    {"image_id":"66faa27e198e5c2d","scenario":"dolphin negative","negative_control":true,"annotations":[]},
+    {"image_id":"72d912496b71dc4d","scenario":"knife negative","negative_control":true,"annotations":[]},
+    {"image_id":"9b28ff00c29c17dd","scenario":"car negative","negative_control":true,"annotations":[]},
+    {"image_id":"7f1f83ed9faaeb58","scenario":"plant negative","negative_control":true,"annotations":[]},
+    {"image_id":"9ca4bdff1a8c8980","scenario":"toy animal negative","negative_control":true,"annotations":[]}
+  ]
+}
